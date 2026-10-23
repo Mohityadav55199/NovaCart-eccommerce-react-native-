@@ -5,9 +5,16 @@ interface OrderSummaryProps {
   shipping: number;
   tax: number;
   total: number;
+  freeShippingRemaining?: number;
 }
 
-export default function OrderSummary({ subtotal, shipping, tax, total }: OrderSummaryProps) {
+export default function OrderSummary({
+  subtotal,
+  shipping,
+  tax,
+  total,
+  freeShippingRemaining = 0,
+}: OrderSummaryProps) {
   return (
     <View className="px-6 mt-6">
       <View className="bg-surface rounded-3xl p-5">
@@ -23,10 +30,20 @@ export default function OrderSummary({ subtotal, shipping, tax, total }: OrderSu
 
           <View className="flex-row justify-between items-center">
             <Text className="text-text-secondary text-base">Shipping</Text>
-            <Text className="text-text-primary font-semibold text-base">
-              ${shipping.toFixed(2)}
+            <Text
+              className={`font-semibold text-base ${
+                shipping === 0 ? "text-primary" : "text-text-primary"
+              }`}
+            >
+              {shipping === 0 ? "FREE" : `$${shipping.toFixed(2)}`}
             </Text>
           </View>
+
+          {freeShippingRemaining > 0 && (
+            <Text className="text-text-secondary text-xs">
+              Add ${freeShippingRemaining.toFixed(2)} more for free shipping
+            </Text>
+          )}
 
           <View className="flex-row justify-between items-center">
             <Text className="text-text-secondary text-base">Tax</Text>

@@ -11,7 +11,7 @@
 - **Authentication** with Clerk (email and social sign-in)
 - **Admin dashboard** (React + Vite): products (CRUD with image upload), orders, customers and live stats
 - **REST API** (Node.js + Express + MongoDB) with role-based, admin-only routes
-- **Payments** with Stripe, including webhook-based order creation
+- **Payments** with Stripe (payment sheet, free shipping over $100, 8% tax), including webhook-based order creation
 - **Image storage** on Cloudinary
 - **Background jobs** with Inngest (Clerk user sync); users are also created on first request as a fallback
 - Optional error monitoring with Sentry
@@ -46,6 +46,12 @@ Optional sample data (10 products; **this clears existing products first**):
 
 ```bash
 npm run seed:products --prefix backend
+```
+
+More demo products (22 across Electronics, Fashion, Accessories, Sports and Books). Additive and safe to re-run: it never deletes or overwrites anything:
+
+```bash
+npm run seed:more --prefix backend
 ```
 
 ## Environment variables

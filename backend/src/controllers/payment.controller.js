@@ -7,6 +7,10 @@ import { Cart } from "../models/cart.model.js";
 
 const stripe = new Stripe(ENV.STRIPE_SECRET_KEY);
 
+const SHIPPING_FEE = 10;
+const FREE_SHIPPING_OVER = 100; // orders with a subtotal at or above this ship free
+const TAX_RATE = 0.08;
+
 export async function createPaymentIntent(req, res) {
   try {
     const { cartItems, shippingAddress } = req.body;
@@ -54,8 +58,9 @@ export async function createPaymentIntent(req, res) {
       return res.status(400).json({ error: "Too many items or address too long for one order" });
     }
 
-    const shipping = 10.0; // $10
-    const tax = subtotal * 0.08; // 8%
+    // keep in sync with mobile/app/(tabs)/cart.tsx
+    const shipping = subtotal >= FREE_SHIPPING_OVER ? 0 : SHIPPING_FEE;
+    const tax = subtotal * TAX_RATE;
     const total = subtotal + shipping + tax;
 
     if (total <= 0) {
@@ -100,7 +105,10 @@ export async function createPaymentIntent(req, res) {
       // in the webhooks section we will use this metadata
     });
 
-    res.status(200).json({ clientSecret: paymentIntent.client_secret });
+    res.status(200).json({
+      clientSecret: paymentIntent.client_secret,
+      amounts: { subtotal, shipping, tax, total },
+    });
   } catch (error) {
     console.error("Error creating payment intent:", error);
     res.status(500).json({ error: "Failed to create payment intent" });

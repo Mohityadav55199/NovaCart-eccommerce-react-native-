@@ -4,6 +4,8 @@ import useCart from "@/hooks/useCart";
 import { useApi } from "@/lib/api";
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useStripe } from "@stripe/stripe-react-native";
+import { useUser } from "@clerk/clerk-expo";
+import { router } from "expo-router";
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
 import { Address } from "@/types";
@@ -13,6 +15,8 @@ import OrderSummary from "@/components/OrderSummary";
 import AddressSelectionModal from "@/components/AddressSelectionModal";
 
 import * as Sentry from "@sentry/react-native";
+
+const FREE_SHIPPING_OVER = 100;
 
 const CartScreen = () => {
   const api = useApi();
@@ -30,6 +34,24 @@ const CartScreen = () => {
   } = useCart();
   const { addresses } = useAddresses();
   const queryClient = useQueryClient();
+  const { user } = useUser();
+
+  const countOrders = async () => {
+    try {
+      const { data } = await api.get("/orders");
+      return (data.orders?.length as number) ?? 0;
+    } catch {
+      return 0;
+    }
+  };
+
+  // up to ~15 s: the webhook normally lands within a couple of seconds
+  const waitForNewOrder = async (before: number) => {
+    for (let attempt = 0; attempt < 10; attempt++) {
+      if ((await countOrders()) > before) return;
+      await new Promise((resolve) => setTimeout(resolve, 1500));
+    }
+  };
 
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
@@ -38,8 +60,9 @@ const CartScreen = () => {
 
   const cartItems = cart?.items || [];
   const subtotal = cartTotal;
-  const shipping = 10.0; // $10 shipping fee
-  const tax = subtotal * 0.08; // 8% tax
+  // keep in sync with backend/src/controllers/payment.controller.js
+  const shipping = subtotal >= FREE_SHIPPING_OVER ? 0 : 10;
+  const tax = subtotal * 0.08;
   const total = subtotal + shipping + tax;
 
   const handleQuantityChange = (productId: string, currentQuantity: number, change: number) => {
@@ -87,6 +110,7 @@ const CartScreen = () => {
 
     try {
       setPaymentLoading(true);
+      const ordersBefore = await countOrders();
 
       // create payment intent with cart items and shipping address
       const { data } = await api.post("/payment/create-intent", {
@@ -104,6 +128,12 @@ const CartScreen = () => {
       const { error: initError } = await initPaymentSheet({
         paymentIntentClientSecret: data.clientSecret,
         merchantDisplayName: "NovaCart",
+        style: "alwaysDark",
+        defaultBillingDetails: {
+          name: user?.fullName ?? undefined,
+          email: user?.primaryEmailAddress?.emailAddress,
+        },
+        allowsDelayedPaymentMethods: false,
       });
 
       if (initError) {
@@ -141,13 +171,15 @@ const CartScreen = () => {
           itemCount: cartItems.length,
         });
 
-        Alert.alert("Success", "Your payment was successful! Your order is being processed.", [
-          { text: "OK", onPress: () => {} },
+        Alert.alert("Payment successful", "Thank you! Your order has been placed.", [
+          { text: "Keep shopping", style: "cancel" },
+          { text: "View my orders", onPress: () => router.push("/orders") },
         ]);
         clearCart();
         // stock changed and the webhook creates the order a moment later
         queryClient.invalidateQueries({ queryKey: ["products"] });
-        queryClient.invalidateQueries({ queryKey: ["orders"] });
+        // the order is created by Stripe's webhook a moment after payment: poll until it shows up
+        waitForNewOrder(ordersBefore).then(() => queryClient.invalidateQueries({ queryKey: ["orders"] }));
       }
     } catch (error) {
       Sentry.logger.error("Payment failed", {
@@ -257,7 +289,13 @@ const CartScreen = () => {
           ))}
         </View>
 
-        <OrderSummary subtotal={subtotal} shipping={shipping} tax={tax} total={total} />
+        <OrderSummary
+          subtotal={subtotal}
+          shipping={shipping}
+          tax={tax}
+          total={total}
+          freeShippingRemaining={Math.max(0, FREE_SHIPPING_OVER - subtotal)}
+        />
       </ScrollView>
 
       <View
