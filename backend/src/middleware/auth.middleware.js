@@ -5,7 +5,7 @@ import { ENV } from "../config/env.js";
 // creates the db user from the Clerk profile when the Inngest sync hasn't run (or is down)
 const createUserFromClerk = async (clerkId) => {
   const clerkUser = await clerkClient.users.getUser(clerkId);
-  const email = clerkUser.emailAddresses[0]?.emailAddress;
+  const email = (clerkUser.primaryEmailAddress || clerkUser.emailAddresses[0])?.emailAddress;
   if (!email) return null;
 
   try {
@@ -18,17 +18,16 @@ const createUserFromClerk = async (clerkId) => {
       wishlist: [],
     });
   } catch (error) {
-    // concurrent first requests: the other one already created it
-    if (error.code === 11000) return User.findOne({ clerkId });
+    // concurrent first requests (or the Inngest sync) already created it
+    if (error.code === 11000 && error.keyPattern?.clerkId) return User.findOne({ clerkId });
     throw error;
   }
 };
 
-const adminEmails = () =>
-  (ENV.ADMIN_EMAIL || "")
-    .split(",")
-    .map((email) => email.trim().toLowerCase())
-    .filter(Boolean);
+const adminEmails = (ENV.ADMIN_EMAIL || "")
+  .split(",")
+  .map((email) => email.trim().toLowerCase())
+  .filter(Boolean);
 
 export const protectRoute = [
   requireAuth(),
@@ -55,7 +54,7 @@ export const adminOnly = (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized - user not found" });
   }
 
-  if (!adminEmails().includes(req.user.email.toLowerCase())) {
+  if (!adminEmails.includes(req.user.email.toLowerCase())) {
     return res.status(403).json({ message: "Forbidden - admin access only" });
   }
 

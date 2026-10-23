@@ -17,6 +17,7 @@ function OrdersPage() {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
     },
+    onError: () => alert("Failed to update the order status. Please try again."),
   });
 
   const handleStatusChange = (orderId, newStatus) => {

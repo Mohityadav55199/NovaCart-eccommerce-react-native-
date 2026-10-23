@@ -20,7 +20,8 @@ const syncUser = inngest.createFunction(
       wishlist: [],
     };
 
-    await User.create(newUser);
+    // upsert: protectRoute may have created the user already
+    await User.updateOne({ clerkId: id }, { $setOnInsert: newUser }, { upsert: true });
   }
 );
 

@@ -48,12 +48,7 @@
           "project": "ecommerce-tut",
           "organization": "codesistency-gs"
         }
-      ],
-      "@sentry/react-native",
-      "@stripe/stripe-react-native",
-      "expo-font",
-      "expo-secure-store",
-      "expo-web-browser"
+      ]
     ],
     "experiments": {
       "typedRoutes": true,
