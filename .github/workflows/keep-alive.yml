@@ -23,10 +23,8 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 20
+      - uses: actions/checkout@v5
+      # ubuntu-latest already ships a recent Node (the script only needs fetch, Node 18+)
       - name: Wake the API
         env:
           API_URL: ${{ vars.API_URL }}
