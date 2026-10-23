@@ -50,7 +50,7 @@ const RatingModal = ({
               </View>
 
               <ScrollView className="mb-4">
-                {order?.orderItems.map((item, index) => {
+                {order?.orderItems.filter((item) => item.product).map((item, index) => {
                   const productId = item.product._id;
                   const currentRating = productRatings[productId] || 0;
 

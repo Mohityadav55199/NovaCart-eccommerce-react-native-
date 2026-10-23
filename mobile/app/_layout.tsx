@@ -15,13 +15,13 @@ Sentry.init({
 
   // Adds more context data to events (IP address, cookies, user, etc.)
   // For more information, visit: https://docs.sentry.io/platforms/react-native/data-management/data-collected/
-  sendDefaultPii: true,
+  sendDefaultPii: __DEV__,
 
   // Enable Logs
   enableLogs: true,
 
   // Configure Session Replay
-  replaysSessionSampleRate: 1.0,
+  replaysSessionSampleRate: __DEV__ ? 1.0 : 0.05,
   replaysOnErrorSampleRate: 1,
   integrations: [Sentry.mobileReplayIntegration()],
 

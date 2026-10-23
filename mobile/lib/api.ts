@@ -1,6 +1,5 @@
 import { useAuth } from "@clerk/clerk-expo";
 import axios from "axios";
-import { useEffect } from "react";
 
 // set EXPO_PUBLIC_API_URL in mobile/.env (local) or as an EAS env var (builds).
 // localhost only works in an emulator; use your LAN IP or the deployed backend on a real device
@@ -33,9 +32,8 @@ api.interceptors.request.use(async (config) => {
 export const useApi = () => {
   const { getToken } = useAuth();
 
-  useEffect(() => {
-    getAuthToken = getToken;
-  }, [getToken]);
+  // assigned during render (not in an effect) so requests fired by the first effects are authenticated
+  getAuthToken = getToken;
 
   return api;
 };

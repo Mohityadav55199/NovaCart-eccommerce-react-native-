@@ -69,6 +69,13 @@ const useCart = () => {
     isAddingToCart: addToCartMutation.isPending,
     isUpdating: updateQuantityMutation.isPending,
     isRemoving: removeFromCartMutation.isPending,
+    addingProductId: addToCartMutation.isPending ? addToCartMutation.variables?.productId : undefined,
+    updatingProductId: updateQuantityMutation.isPending
+      ? updateQuantityMutation.variables?.productId
+      : undefined,
+    removingProductId: removeFromCartMutation.isPending
+      ? removeFromCartMutation.variables
+      : undefined,
     isClearing: clearCartMutation.isPending,
   };
 };

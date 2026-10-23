@@ -5,6 +5,7 @@ import { useApi } from "@/lib/api";
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { useStripe } from "@stripe/stripe-react-native";
 import { useState } from "react";
+import { useQueryClient } from "@tanstack/react-query";
 import { Address } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
@@ -22,12 +23,13 @@ const CartScreen = () => {
     clearCart,
     isError,
     isLoading,
-    isRemoving,
-    isUpdating,
+    removingProductId,
+    updatingProductId,
     removeFromCart,
     updateQuantity,
   } = useCart();
   const { addresses } = useAddresses();
+  const queryClient = useQueryClient();
 
   const { initPaymentSheet, presentPaymentSheet } = useStripe();
 
@@ -81,7 +83,6 @@ const CartScreen = () => {
     Sentry.logger.info("Checkout initiated", {
       itemCount: cartItemCount,
       total: total.toFixed(2),
-      city: selectedAddress.city,
     });
 
     try {
@@ -144,6 +145,9 @@ const CartScreen = () => {
           { text: "OK", onPress: () => {} },
         ]);
         clearCart();
+        // stock changed and the webhook creates the order a moment later
+        queryClient.invalidateQueries({ queryKey: ["products"] });
+        queryClient.invalidateQueries({ queryKey: ["orders"] });
       }
     } catch (error) {
       Sentry.logger.error("Payment failed", {
@@ -152,7 +156,8 @@ const CartScreen = () => {
         itemCount: cartItems.length,
       });
 
-      Alert.alert("Error", "Failed to process payment");
+      // show the reason the server gave (out of stock, cart too large...) when there is one
+      Alert.alert("Error", (error as any)?.response?.data?.error || "Failed to process payment");
     } finally {
       setPaymentLoading(false);
     }
@@ -211,9 +216,9 @@ const CartScreen = () => {
                       className="bg-background-lighter rounded-full w-9 h-9 items-center justify-center"
                       activeOpacity={0.7}
                       onPress={() => handleQuantityChange(item.product._id, item.quantity, -1)}
-                      disabled={isUpdating}
+                      disabled={updatingProductId === item.product._id}
                     >
-                      {isUpdating ? (
+                      {updatingProductId === item.product._id ? (
                         <ActivityIndicator size="small" color="#FFFFFF" />
                       ) : (
                         <Ionicons name="remove" size={18} color="#FFFFFF" />
@@ -228,9 +233,9 @@ const CartScreen = () => {
                       className="bg-primary rounded-full w-9 h-9 items-center justify-center"
                       activeOpacity={0.7}
                       onPress={() => handleQuantityChange(item.product._id, item.quantity, 1)}
-                      disabled={isUpdating}
+                      disabled={updatingProductId === item.product._id}
                     >
-                      {isUpdating ? (
+                      {updatingProductId === item.product._id ? (
                         <ActivityIndicator size="small" color="#121212" />
                       ) : (
                         <Ionicons name="add" size={18} color="#121212" />
@@ -241,7 +246,7 @@ const CartScreen = () => {
                       className="ml-auto bg-red-500/10 rounded-full w-9 h-9 items-center justify-center"
                       activeOpacity={0.7}
                       onPress={() => handleRemoveItem(item.product._id, item.product.name)}
-                      disabled={isRemoving}
+                      disabled={removingProductId === item.product._id}
                     >
                       <Ionicons name="trash-outline" size={18} color="#EF4444" />
                     </TouchableOpacity>

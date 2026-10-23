@@ -23,7 +23,7 @@ const ProductsGrid = ({ products, isLoading, isError }: ProductsGridProps) => {
   const { isInWishlist, toggleWishlist, isAddingToWishlist, isRemovingFromWishlist } =
     useWishlist();
 
-  const { isAddingToCart, addToCart } = useCart();
+  const { addingProductId, addToCart } = useCart();
 
   const handleAddToCart = (productId: string, productName: string) => {
     addToCart(
@@ -92,9 +92,9 @@ const ProductsGrid = ({ products, isLoading, isError }: ProductsGridProps) => {
             className="bg-primary rounded-full w-8 h-8 items-center justify-center"
             activeOpacity={0.7}
             onPress={() => handleAddToCart(product._id, product.name)}
-            disabled={isAddingToCart}
+            disabled={product.stock === 0 || addingProductId === product._id}
           >
-            {isAddingToCart ? (
+            {addingProductId === product._id ? (
               <ActivityIndicator size="small" color="#121212" />
             ) : (
               <Ionicons name="add" size={18} color="#121212" />

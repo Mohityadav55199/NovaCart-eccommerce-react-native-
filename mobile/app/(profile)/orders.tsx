@@ -25,8 +25,8 @@ function OrdersScreen() {
     // init ratings for all product to 0 - resettin the state for each product
     const initialRatings: { [key: string]: number } = {};
     order.orderItems.forEach((item) => {
-      const productId = item.product._id;
-      initialRatings[productId] = 0;
+      if (!item.product) return; // product was deleted
+      initialRatings[item.product._id] = 0;
     });
     setProductRatings(initialRatings);
   };
@@ -41,24 +41,35 @@ function OrdersScreen() {
       return;
     }
 
-    try {
-      await Promise.all(
-        selectedOrder.orderItems.map((item) => {
-          return createReviewAsync({
-            productId: item.product._id,
-            orderId: selectedOrder._id,
-            rating: productRatings[item.product._id],
-          });
-        })
-      );
+    const items = selectedOrder.orderItems.filter((item) => item.product);
 
-      Alert.alert("Success", "Thank you for rating all products!");
-      setShowRatingModal(false);
-      setSelectedOrder(null);
-      setProductRatings({});
-    } catch (error: any) {
-      Alert.alert("Error", error?.response?.data?.error || "Failed to submit rating");
+    // allSettled: one failing product must not hide that the others were saved
+    const results = await Promise.allSettled(
+      items.map((item) =>
+        createReviewAsync({
+          productId: item.product._id,
+          orderId: selectedOrder._id,
+          rating: productRatings[item.product._id],
+        })
+      )
+    );
+
+    const failed = results.filter((result) => result.status === "rejected");
+    if (failed.length > 0) {
+      const reason = (failed[0] as PromiseRejectedResult).reason;
+      Alert.alert(
+        "Some ratings failed",
+        `${items.length - failed.length} of ${items.length} saved. ${
+          reason?.response?.data?.error || "Please try again."
+        }`
+      );
+      return;
     }
+
+    Alert.alert("Success", "Thank you for rating all products!");
+    setShowRatingModal(false);
+    setSelectedOrder(null);
+    setProductRatings({});
   };
 
   return (

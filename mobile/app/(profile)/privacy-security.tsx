@@ -15,7 +15,7 @@ type SecurityOption = {
 
 function PrivacyAndSecurityScreen() {
   const [twoFactorEnabled, setTwoFactorEnabled] = useState(false);
-  const [biometricEnabled, setBiometricEnabled] = useState(true);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
   const [pushNotifications, setPushNotifications] = useState(true);
   const [emailNotifications, setEmailNotifications] = useState(true);
   const [marketingEmails, setMarketingEmails] = useState(false);
@@ -133,7 +133,10 @@ function PrivacyAndSecurityScreen() {
         <TouchableOpacity onPress={() => router.back()} className="mr-4">
           <Ionicons name="arrow-back" size={28} color="#fff" />
         </TouchableOpacity>
-        <Text className="text-text-primary text-2xl font-bold">Privacy & Security</Text>
+        <View>
+          <Text className="text-text-primary text-2xl font-bold">Privacy & Security</Text>
+          <Text className="text-text-secondary text-xs mt-1">Coming soon: these settings are not active yet</Text>
+        </View>
       </View>
 
       <ScrollView
@@ -164,7 +167,7 @@ function PrivacyAndSecurityScreen() {
                 </View>
 
                 {setting.type === "toggle" ? (
-                  <Switch
+                  <Switch disabled
                     value={setting.value}
                     onValueChange={(value) => handleToggle(setting.id, value)}
                     thumbColor="#FFFFFF"
@@ -197,7 +200,7 @@ function PrivacyAndSecurityScreen() {
                     </Text>
                     <Text className="text-text-secondary text-sm">{setting.description}</Text>
                   </View>
-                  <Switch
+                  <Switch disabled
                     value={setting.value}
                     onValueChange={(value) => handleToggle(setting.id, value)}
                     trackColor={{ false: "#2A2A2A", true: "#1DB954" }}
