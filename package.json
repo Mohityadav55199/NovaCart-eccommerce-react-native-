@@ -7,8 +7,14 @@
     "node": ">=20.0.0"
   },
   "scripts": {
+    "dev": "concurrently -n \"backend,admin,mobile\" -c \"blue,green,magenta\" \"npm run dev:backend\" \"npm run dev:admin\" \"npm run dev:mobile\"",
+    "dev:backend": "npm run dev --prefix backend",
+    "dev:admin": "npm run dev --prefix admin",
+    "dev:mobile": "npm run start --prefix mobile",
     "build": "npm install --prefix backend && npm install --prefix admin && npm run build --prefix admin",
-    "start": "npm run start --prefix backend"
+    "start": "npm run start --prefix backend",
+    "start:all": "concurrently -n \"backend,admin,mobile\" -c \"blue,green,magenta\" \"npm run dev:backend\" \"npm run dev:admin\" \"npm run dev:mobile\"",
+    "install:all": "npm install && npm install --prefix backend && npm install --prefix admin && npm install --prefix mobile"
   },
   "repository": {
     "url": "git+https://github.com/Mohityadav55199/NovaCart-eccommerce-react-native-.git"
@@ -20,5 +26,8 @@
   "bugs": {
     "url": "https://github.com/Mohityadav55199/NovaCart-eccommerce-react-native-/issues"
   },
-  "homepage": "https://github.com/Mohityadav55199/NovaCart-eccommerce-react-native-#readme"
+  "homepage": "https://github.com/Mohityadav55199/NovaCart-eccommerce-react-native-#readme",
+  "devDependencies": {
+    "concurrently": "^10.0.6"
+  }
 }
