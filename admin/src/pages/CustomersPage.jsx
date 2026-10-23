@@ -1,4 +1,4 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { describeError, ERROR_HINT } from "../lib/errors";
 import Avatar from "../components/Avatar";
 import { customerApi } from "../lib/api";
@@ -8,6 +8,13 @@ function CustomersPage() {
   const { data, isLoading, isError, error } = useQuery({
     queryKey: ["customers"],
     queryFn: customerApi.getAll,
+  });
+
+  const queryClient = useQueryClient();
+  const roleMutation = useMutation({
+    mutationFn: customerApi.setRole,
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["customers"] }),
+    onError: (err) => alert(describeError(err)),
   });
 
   const customers = data?.customers || [];
@@ -43,6 +50,7 @@ function CustomersPage() {
                   <tr>
                     <th>Customer</th>
                     <th>Email</th>
+                    <th>Role</th>
                     <th>Addresses</th>
                     <th>Wishlist</th>
                     <th>Joined Date</th>
@@ -58,6 +66,28 @@ function CustomersPage() {
                       </td>
 
                       <td>{customer.email}</td>
+                      <td>
+                        {customer.role === "admin" ? (
+                          <div className="badge badge-primary">Admin</div>
+                        ) : (
+                          <select
+                            className="select select-sm"
+                            value={customer.role}
+                            disabled={roleMutation.isPending}
+                            onChange={(e) => {
+                              const role = e.target.value;
+                              const message =
+                                role === "vendor"
+                                  ? `Make ${customer.name} a vendor? They will be able to manage their own products and orders in this admin site.`
+                                  : `Make ${customer.name} a regular customer? They will lose access to this admin site.`;
+                              if (window.confirm(message)) roleMutation.mutate({ id: customer._id, role });
+                            }}
+                          >
+                            <option value="customer">Customer</option>
+                            <option value="vendor">Vendor</option>
+                          </select>
+                        )}
+                      </td>
 
                       <td>
                         <div className="badge badge-ghost">

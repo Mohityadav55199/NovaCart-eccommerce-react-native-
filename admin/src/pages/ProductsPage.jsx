@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { describeError, ERROR_HINT } from "../lib/errors";
+import { useRole } from "../lib/role";
 import { PlusIcon, PencilIcon, Trash2Icon, XIcon, ImageIcon } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productApi } from "../lib/api";
@@ -19,6 +20,7 @@ function ProductsPage() {
   const [imagePreviews, setImagePreviews] = useState([]);
 
   const queryClient = useQueryClient();
+  const { role } = useRole();
 
   // fetch some data
   const {
@@ -179,7 +181,10 @@ function ProductsPage() {
                     <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <h3 className="card-title">{product.name}</h3>
-                        <p className="text-base-content/70 text-sm">{product.category}</p>
+                        <p className="text-base-content/70 text-sm">
+                          {product.category}
+                          {role === "admin" && ` · ${product.vendor?.name ? `Vendor: ${product.vendor.name}` : "Store product"}`}
+                        </p>
                       </div>
                       <div className={`badge ${status.class} h-auto whitespace-nowrap shrink-0 py-1`}>{status.text}</div>
                     </div>

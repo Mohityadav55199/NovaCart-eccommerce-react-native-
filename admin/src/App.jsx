@@ -11,6 +11,13 @@ import DashboardLayout from "./layouts/DashboardLayout";
 
 import PageLoader from "./components/PageLoader";
 import AdminGate from "./components/AdminGate";
+import { useRole } from "./lib/role";
+
+// customers (and role management) are for admins only
+function CustomersRoute() {
+  const { role } = useRole();
+  return role === "admin" ? <CustomersPage /> : <Navigate to="/dashboard" replace />;
+}
 
 function App() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
@@ -38,7 +45,7 @@ function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="orders" element={<OrdersPage />} />
-        <Route path="customers" element={<CustomersPage />} />
+        <Route path="customers" element={<CustomersRoute />} />
       </Route>
     </Routes>
   );

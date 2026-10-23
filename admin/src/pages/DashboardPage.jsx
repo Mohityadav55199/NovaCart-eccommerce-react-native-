@@ -1,6 +1,7 @@
 import { useQuery } from "@tanstack/react-query";
 import { describeError, ERROR_HINT } from "../lib/errors";
 import { orderApi, statsApi } from "../lib/api";
+import { useRole } from "../lib/role";
 import { DollarSignIcon, PackageIcon, ShoppingBagIcon, UsersIcon } from "lucide-react";
 import { capitalizeText, formatDate, getOrderStatusBadge } from "../lib/utils";
 
@@ -19,6 +20,8 @@ function DashboardPage() {
   // but we're just keeping it simple here...
   const recentOrders = ordersData?.orders?.slice(0, 5) || [];
 
+  const { role } = useRole();
+
   const statsCards = [
     {
       name: "Total Revenue",
@@ -30,11 +33,15 @@ function DashboardPage() {
       value: statsLoading ? "..." : statsError ? "-" : statsData?.totalOrders || 0,
       icon: <ShoppingBagIcon className="size-8" />,
     },
-    {
-      name: "Total Customers",
-      value: statsLoading ? "..." : statsError ? "-" : statsData?.totalCustomers || 0,
-      icon: <UsersIcon className="size-8" />,
-    },
+    ...(role === "admin"
+      ? [
+          {
+            name: "Total Customers",
+            value: statsLoading ? "..." : statsError ? "-" : statsData?.totalCustomers || 0,
+            icon: <UsersIcon className="size-8" />,
+          },
+        ]
+      : []),
     {
       name: "Total Products",
       value: statsLoading ? "..." : statsError ? "-" : statsData?.totalProducts || 0,
@@ -115,7 +122,7 @@ function DashboardPage() {
                       </td>
 
                       <td>
-                        <span className="font-semibold">${order.totalPrice.toFixed(2)}</span>
+                        <span className="font-semibold">${(order.myTotal ?? order.totalPrice).toFixed(2)}</span>
                       </td>
 
                       <td>

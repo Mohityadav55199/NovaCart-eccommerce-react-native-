@@ -2,10 +2,12 @@ import { useUser } from "@clerk/clerk-react";
 import { ShoppingBagIcon } from "lucide-react";
 import { Link, useLocation } from "react-router";
 import Avatar from "./Avatar";
+import { useRole } from "../lib/role";
 import { NAVIGATION } from "./Navbar";
 
 function Sidebar() {
   const location = useLocation();
+  const { role } = useRole();
   const { user } = useUser();
 
   return (
@@ -18,12 +20,15 @@ function Sidebar() {
             <div className="size-10 bg-primary rounded-xl flex items-center justify-center shrink-0">
               <ShoppingBagIcon className="w-6 h-6 text-primary-content" />
             </div>
-            <span className="text-xl font-bold is-drawer-close:hidden">Admin</span>
+            <div className="is-drawer-close:hidden">
+              <span className="text-xl font-bold block leading-tight">NovaCart</span>
+              <span className="badge badge-sm badge-primary badge-outline capitalize">{role}</span>
+            </div>
           </div>
         </div>
 
         <ul className="menu w-full grow flex flex-col gap-2">
-          {NAVIGATION.map((item) => {
+          {NAVIGATION.filter((item) => item.roles.includes(role)).map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <li key={item.path}>

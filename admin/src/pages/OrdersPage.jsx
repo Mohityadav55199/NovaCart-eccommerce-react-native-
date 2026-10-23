@@ -1,38 +1,57 @@
-import { orderApi } from "../lib/api";
+import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { orderApi } from "../lib/api";
 import { describeError, ERROR_HINT } from "../lib/errors";
-import { formatDate } from "../lib/utils";
+import { useRole } from "../lib/role";
+import { capitalizeText, formatDate, getOrderStatusBadge } from "../lib/utils";
+import OrderDetailsModal from "../components/OrderDetailsModal";
 
-import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
+const FILTERS = ["all", "pending", "shipped", "delivered", "cancelled"];
 
 function OrdersPage() {
-  const queryClient = useQueryClient();
+  const { role } = useRole();
+  const [filter, setFilter] = useState("all");
+  const [selectedId, setSelectedId] = useState(null);
 
   const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ["orders"],
     queryFn: orderApi.getAll,
   });
 
-  const updateStatusMutation = useMutation({
-    mutationFn: orderApi.updateStatus,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
-    },
-    onError: () => alert("Failed to update the order status. Please try again."),
-  });
+  const allOrders = ordersData?.orders || [];
+  const orders = filter === "all" ? allOrders : allOrders.filter((order) => order.status === filter);
 
-  const handleStatusChange = (orderId, newStatus) => {
-    updateStatusMutation.mutate({ orderId, status: newStatus });
-  };
-
-  const orders = ordersData?.orders || [];
+  // read the open order from the list so it refreshes after every change
+  const selectedOrder = allOrders.find((order) => order._id === selectedId);
 
   return (
     <div className="space-y-6">
       {/* HEADER */}
       <div className="flex flex-col gap-2">
         <h1 className="text-2xl font-bold">Orders</h1>
-        <p className="text-base-content/70">Manage customer orders</p>
+        <p className="text-base-content/70">
+          {role === "vendor"
+            ? "Orders containing your products. Add tracking when you ship."
+            : "Track, fulfil and cancel customer orders"}
+        </p>
+      </div>
+
+      {/* FILTERS */}
+      <div className="tabs tabs-box w-fit max-w-full overflow-x-auto">
+        {FILTERS.map((name) => (
+          <button
+            key={name}
+            className={`tab ${filter === name ? "tab-active" : ""}`}
+            onClick={() => setFilter(name)}
+          >
+            {capitalizeText(name)}
+            {name !== "all" && (
+              <span className="ml-1 opacity-60">
+                {allOrders.filter((order) => order.status === name).length}
+              </span>
+            )}
+          </button>
+        ))}
       </div>
 
       {/* ORDERS TABLE */}
@@ -46,7 +65,9 @@ function OrdersPage() {
             </div>
           ) : orders.length === 0 ? (
             <div className="text-center py-12 text-base-content/60">
-              <p className="text-xl font-semibold mb-2">No orders yet</p>
+              <p className="text-xl font-semibold mb-2">
+                {filter === "all" ? "No orders yet" : `No ${filter} orders`}
+              </p>
               <p className="text-sm">Orders will appear here once customers make purchases</p>
             </div>
           ) : (
@@ -57,21 +78,19 @@ function OrdersPage() {
                     <th>Order ID</th>
                     <th>Customer</th>
                     <th>Items</th>
-                    <th>Total</th>
+                    <th>{role === "vendor" ? "Your total" : "Total"}</th>
                     <th>Status</th>
                     <th>Date</th>
+                    <th />
                   </tr>
                 </thead>
 
                 <tbody>
                   {orders.map((order) => {
-                    const totalQuantity = order.orderItems.reduce(
-                      (sum, item) => sum + item.quantity,
-                      0
-                    );
+                    const totalQuantity = order.orderItems.reduce((sum, item) => sum + item.quantity, 0);
 
                     return (
-                      <tr key={order._id}>
+                      <tr key={order._id} className="hover cursor-pointer" onClick={() => setSelectedId(order._id)}>
                         <td>
                           <span className="font-medium">#{order._id.slice(-8).toUpperCase()}</span>
                         </td>
@@ -92,24 +111,31 @@ function OrdersPage() {
                         </td>
 
                         <td>
-                          <span className="font-semibold">${order.totalPrice.toFixed(2)}</span>
+                          <span className="font-semibold">
+                            ${(order.myTotal ?? order.totalPrice).toFixed(2)}
+                          </span>
                         </td>
 
                         <td>
-                          <select
-                            value={order.status}
-                            onChange={(e) => handleStatusChange(order._id, e.target.value)}
-                            className="select select-sm"
-                            disabled={updateStatusMutation.isPending}
-                          >
-                            <option value="pending">Pending</option>
-                            <option value="shipped">Shipped</option>
-                            <option value="delivered">Delivered</option>
-                          </select>
+                          <div className={`badge ${getOrderStatusBadge(order.status)}`}>
+                            {capitalizeText(order.status)}
+                          </div>
                         </td>
 
                         <td>
                           <span className="text-sm opacity-60">{formatDate(order.createdAt)}</span>
+                        </td>
+
+                        <td>
+                          <button
+                            className="btn btn-ghost btn-sm"
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              setSelectedId(order._id);
+                            }}
+                          >
+                            Details
+                          </button>
                         </td>
                       </tr>
                     );
@@ -120,6 +146,8 @@ function OrdersPage() {
           )}
         </div>
       </div>
+
+      {selectedOrder && <OrderDetailsModal order={selectedOrder} onClose={() => setSelectedId(null)} />}
     </div>
   );
 }

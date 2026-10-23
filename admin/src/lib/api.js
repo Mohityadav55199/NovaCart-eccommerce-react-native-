@@ -32,6 +32,18 @@ export const orderApi = {
     const { data } = await axiosInstance.patch(`/admin/orders/${orderId}/status`, { status });
     return data;
   },
+
+  // one item: status, carrier and tracking number (admin, or the vendor who owns the item)
+  updateItem: async ({ orderId, itemId, ...fields }) => {
+    const { data } = await axiosInstance.patch(`/admin/orders/${orderId}/items/${itemId}`, fields);
+    return data;
+  },
+
+  // admin: cancel an unshipped order and refund the customer
+  cancel: async ({ orderId, reason }) => {
+    const { data } = await axiosInstance.post(`/admin/orders/${orderId}/cancel`, { reason });
+    return data;
+  },
 };
 
 export const adminApi = {
@@ -49,6 +61,11 @@ export const statsApi = {
 };
 
 export const customerApi = {
+  setRole: async ({ id, role }) => {
+    const { data } = await axiosInstance.patch(`/admin/customers/${id}/role`, { role });
+    return data;
+  },
+
   getAll: async () => {
     const { data } = await axiosInstance.get("/admin/customers");
     return data;

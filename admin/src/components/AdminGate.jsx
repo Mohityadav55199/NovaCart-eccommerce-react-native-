@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import { RoleContext } from "../lib/role";
 import { adminApi } from "../lib/api";
 import { describeError } from "../lib/errors";
 import AccessDenied from "./AccessDenied";
@@ -6,7 +7,7 @@ import PageLoader from "./PageLoader";
 
 // asks the API whether this account is an admin before any admin screen is rendered
 function AdminGate({ children }) {
-  const { isLoading, isError, error, refetch } = useQuery({
+  const { data, isLoading, isError, error, refetch } = useQuery({
     queryKey: ["adminCheck"],
     queryFn: adminApi.check,
     // a 401/403 is a definite answer; only retry network hiccups (e.g. Render waking up)
@@ -32,7 +33,7 @@ function AdminGate({ children }) {
     );
   }
 
-  return children;
+  return <RoleContext.Provider value={{ role: data?.role, name: data?.name }}>{children}</RoleContext.Provider>;
 }
 
 export default AdminGate;
