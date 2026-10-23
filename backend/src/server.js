@@ -27,7 +27,21 @@ const __dirname = path.resolve();
 app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
 
 app.use(express.json());
-app.use(cors({ origin: ENV.CLIENT_URL, credentials: true })); // credentials: true allows the browser to send the cookies to the server with the request
+// CLIENT_URL may hold several comma-separated origins. Each one is cleaned (quotes, spaces, stray
+// non-ASCII characters and a trailing slash from copy-paste) because a bad character in this value
+// makes the cors package throw on every request.
+const allowedOrigins = (ENV.CLIENT_URL || "")
+  .split(",")
+  .map((origin) => origin.replace(/[^!-~]/g, "").replace(/^["']|["']$/g, "").replace(/\/+$/, ""))
+  .filter(Boolean);
+
+app.use(
+  cors({
+    // no Origin header = not a browser (curl, Stripe webhook, mobile app): allow
+    origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)),
+    credentials: true, // lets the browser send cookies with the request
+  })
+);
 
 // adds the auth object under req.auth; Stripe's webhook is verified by its signature instead
 app.use((req, res, next) =>
