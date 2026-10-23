@@ -12,7 +12,8 @@ name: Keep API awake
 # - One always-awake free service uses ~744 of Render's 750 free instance hours per month.
 on:
   schedule:
-    - cron: "*/10 * * * *"
+    # minutes 4,14,24...: GitHub is busiest on :00/:10/:20 and drops or delays runs there
+    - cron: "4-59/10 * * * *"
   workflow_dispatch: # run it by hand from the Actions tab
 
 permissions:
