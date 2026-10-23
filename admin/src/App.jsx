@@ -10,6 +10,7 @@ import CustomersPage from "./pages/CustomersPage";
 import DashboardLayout from "./layouts/DashboardLayout";
 
 import PageLoader from "./components/PageLoader";
+import AdminGate from "./components/AdminGate";
 
 function App() {
   const { isSignedIn, isLoaded, getToken } = useAuth();
@@ -24,7 +25,15 @@ function App() {
     <Routes>
       <Route path="/login" element={isSignedIn ? <Navigate to={"/dashboard"} /> : <LoginPage />} />
 
-      <Route path="/" element={isSignedIn ? <DashboardLayout /> : <Navigate to={"/login"} />}>
+      <Route path="/" element={
+          isSignedIn ? (
+            <AdminGate>
+              <DashboardLayout />
+            </AdminGate>
+          ) : (
+            <Navigate to={"/login"} />
+          )
+        }>
         <Route index element={<Navigate to={"dashboard"} />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="products" element={<ProductsPage />} />

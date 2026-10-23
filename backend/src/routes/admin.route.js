@@ -29,6 +29,9 @@ router.get("/customers", getAllCustomers);
 
 router.get("/stats", getDashboardStats);
 
+// 200 only for admins (adminOnly above answers 403 otherwise): the admin site uses it as its gate
+router.get("/check", (req, res) => res.status(200).json({ admin: true }));
+
 // PUT: Used for full resource replacement, updating the entire resource
 // PATCH: Used for partial resource updates, updating a specific part of the resource
 
