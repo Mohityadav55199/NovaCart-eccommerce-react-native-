@@ -4,12 +4,12 @@ import { DollarSignIcon, PackageIcon, ShoppingBagIcon, UsersIcon } from "lucide-
 import { capitalizeText, formatDate, getOrderStatusBadge } from "../lib/utils";
 
 function DashboardPage() {
-  const { data: ordersData, isLoading: ordersLoading, isError: ordersError } = useQuery({
+  const { data: ordersData, isLoading: ordersLoading, isError: ordersError, error: ordersErr } = useQuery({
     queryKey: ["orders"],
     queryFn: orderApi.getAll,
   });
 
-  const { data: statsData, isLoading: statsLoading, isError: statsError } = useQuery({
+  const { data: statsData, isLoading: statsLoading, isError: statsError, error: statsErr } = useQuery({
     queryKey: ["dashboardStats"],
     queryFn: statsApi.getDashboard,
   });
@@ -45,7 +45,16 @@ function DashboardPage() {
     <div className="space-y-6">
       {(statsError || ordersError) && (
         <div role="alert" className="alert alert-error">
-          <span>Couldn't load dashboard data. Check that the backend is running and you're signed in as the admin.</span>
+          <span>
+            Couldn't load dashboard data
+            {(() => {
+              const err = statsErr || ordersErr;
+              const status = err?.response?.status;
+              const detail = err?.response?.data?.message || err?.response?.data?.error || err?.message;
+              return ` (${status ? `HTTP ${status}: ` : ""}${detail}).`;
+            })()}{" "}
+            401 means not signed in, 403 means this email is not the admin, and a network error means the API is asleep or unreachable.
+          </span>
         </div>
       )}
 

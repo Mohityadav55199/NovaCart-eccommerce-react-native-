@@ -1,4 +1,4 @@
-import { clerkClient, requireAuth } from "@clerk/express";
+import { clerkClient } from "@clerk/express";
 import { User } from "../models/user.model.js";
 import { ENV } from "../config/env.js";
 import { buildUserDoc } from "../utils/user.js";
@@ -31,8 +31,14 @@ const adminEmails = (ENV.ADMIN_EMAIL || "")
   .map((email) => email.trim().toLowerCase())
   .filter(Boolean);
 
+// an API must answer 401 JSON; Clerk's requireAuth() redirects to "/" which a SPA can't make sense of
+const requireSignIn = (req, res, next) => {
+  if (!req.auth?.()?.userId) return res.status(401).json({ message: "Unauthorized - please sign in" });
+  next();
+};
+
 export const protectRoute = [
-  requireAuth(),
+  requireSignIn,
   async (req, res, next) => {
     try {
       const clerkId = req.auth().userId;

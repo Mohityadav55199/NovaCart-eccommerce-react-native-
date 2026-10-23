@@ -13,7 +13,8 @@ export const setTokenGetter = (fn) => {
 };
 
 axiosInstance.interceptors.request.use(async (config) => {
-  const token = getToken ? await getToken() : null;
+  // window.Clerk is ready as soon as ClerkProvider has loaded; the hook-provided getter is the fallback
+  const token = (await window.Clerk?.session?.getToken()) ?? (getToken ? await getToken() : null);
   if (token) config.headers.Authorization = `Bearer ${token}`;
   return config;
 });
