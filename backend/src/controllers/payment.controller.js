@@ -145,6 +145,17 @@ export async function handleWebhook(req, res) {
         return res.json({ received: true });
       }
 
+      // A late or retried event can arrive after the payment was refunded (cancelled order, sold out).
+      // Never create an order for money that has already been returned.
+      if (paymentIntent.latest_charge) {
+        const chargeId = typeof paymentIntent.latest_charge === "string" ? paymentIntent.latest_charge : paymentIntent.latest_charge.id;
+        const charge = await stripe.charges.retrieve(chargeId);
+        if (charge.refunded) {
+          console.log("Payment already refunded, no order created:", paymentIntent.id);
+          return res.json({ received: true });
+        }
+      }
+
       // the cart only holds product id, quantity and price: look up the rest
       const items = JSON.parse(unpackMeta("items", metadata) || metadata.orderItems);
       const address = JSON.parse(unpackMeta("address", metadata) || metadata.shippingAddress);
