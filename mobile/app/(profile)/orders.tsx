@@ -44,7 +44,7 @@ function OrdersScreen() {
     try {
       await Promise.all(
         selectedOrder.orderItems.map((item) => {
-          createReviewAsync({
+          return createReviewAsync({
             productId: item.product._id,
             orderId: selectedOrder._id,
             rating: productRatings[item.product._id],

@@ -1,14 +1,26 @@
+import fs from "node:fs/promises";
 import cloudinary from "../config/cloudinary.js";
 import { Product } from "../models/product.model.js";
 import { Order } from "../models/order.model.js";
 import { User } from "../models/user.model.js";
 
+// multer writes uploads to the OS temp dir; remove them once Cloudinary has them
+async function removeTempFiles(files = []) {
+  await Promise.all(files.map((file) => fs.unlink(file.path).catch(() => {})));
+}
+
 export async function createProduct(req, res) {
   try {
     const { name, description, price, stock, category } = req.body;
 
-    if (!name || !description || !price || !stock || !category) {
+    if (!name || !description || !category || price === undefined || stock === undefined) {
       return res.status(400).json({ message: "All fields are required" });
+    }
+
+    const parsedPrice = parseFloat(price);
+    const parsedStock = Number(stock);
+    if (!Number.isFinite(parsedPrice) || parsedPrice < 0 || !Number.isInteger(parsedStock) || parsedStock < 0) {
+      return res.status(400).json({ message: "Price and stock must be valid non-negative numbers" });
     }
 
     if (!req.files || req.files.length === 0) {
@@ -32,8 +44,8 @@ export async function createProduct(req, res) {
     const product = await Product.create({
       name,
       description,
-      price: parseFloat(price),
-      stock: parseInt(stock),
+      price: parsedPrice,
+      stock: parsedStock,
       category,
       images: imageUrls,
     });
@@ -42,6 +54,8 @@ export async function createProduct(req, res) {
   } catch (error) {
     console.error("Error creating product", error);
     res.status(500).json({ message: "Internal server error" });
+  } finally {
+    await removeTempFiles(req.files);
   }
 }
 
@@ -68,8 +82,20 @@ export async function updateProduct(req, res) {
 
     if (name) product.name = name;
     if (description) product.description = description;
-    if (price !== undefined) product.price = parseFloat(price);
-    if (stock !== undefined) product.stock = parseInt(stock);
+    if (price !== undefined) {
+      const parsedPrice = parseFloat(price);
+      if (!Number.isFinite(parsedPrice) || parsedPrice < 0) {
+        return res.status(400).json({ message: "Invalid price" });
+      }
+      product.price = parsedPrice;
+    }
+    if (stock !== undefined) {
+      const parsedStock = Number(stock);
+      if (!Number.isInteger(parsedStock) || parsedStock < 0) {
+        return res.status(400).json({ message: "Invalid stock" });
+      }
+      product.stock = parsedStock;
+    }
     if (category) product.category = category;
 
     // handle image updates if new images are uploaded
@@ -93,6 +119,8 @@ export async function updateProduct(req, res) {
   } catch (error) {
     console.error("Error updating products:", error);
     res.status(500).json({ message: "Internal server error" });
+  } finally {
+    await removeTempFiles(req.files);
   }
 }
 
@@ -192,17 +220,16 @@ export const deleteProduct = async (req, res) => {
       return res.status(404).json({ message: "Product not found" });
     }
 
-    // Delete images from Cloudinary
-    if (product.images && product.images.length > 0) {
-      const deletePromises = product.images.map((imageUrl) => {
-        // Extract public_id from URL (assumes format: .../products/publicId.ext)
-        const publicId = "products/" + imageUrl.split("/products/")[1]?.split(".")[0];
-        if (publicId) return cloudinary.uploader.destroy(publicId);
-      });
-      await Promise.all(deletePromises.filter(Boolean));
-    }
-
     await Product.findByIdAndDelete(id);
+
+    // Delete our uploaded images from Cloudinary (seeded/external image URLs are skipped).
+    // This runs after the DB delete, so a Cloudinary failure can't leave the product undeletable.
+    const publicIds = (product.images || [])
+      .map((imageUrl) => imageUrl.split("/products/")[1]?.replace(/\.[^./]+$/, ""))
+      .filter(Boolean)
+      .map((name) => `products/${name}`);
+    await Promise.allSettled(publicIds.map((publicId) => cloudinary.uploader.destroy(publicId)));
+
     res.status(200).json({ message: "Product deleted successfully" });
   } catch (error) {
     console.error("Error deleting product:", error);

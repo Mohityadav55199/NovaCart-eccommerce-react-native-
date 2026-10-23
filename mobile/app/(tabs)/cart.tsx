@@ -102,7 +102,7 @@ const CartScreen = () => {
 
       const { error: initError } = await initPaymentSheet({
         paymentIntentClientSecret: data.clientSecret,
-        merchantDisplayName: "Your Store Name",
+        merchantDisplayName: "NovaCart",
       });
 
       if (initError) {
@@ -122,14 +122,18 @@ const CartScreen = () => {
       const { error: presentError } = await presentPaymentSheet();
 
       if (presentError) {
-        Sentry.logger.error("Payment cancelled", {
-          errorCode: presentError.code,
-          errorMessage: presentError.message,
-          cartTotal: total,
-          itemCount: cartItems.length,
-        });
-
-        Alert.alert("Payment cancelled", presentError.message);
+        if (presentError.code === "Canceled") {
+          // the user closed the sheet: nothing went wrong
+          Sentry.logger.info("Payment cancelled by user", { cartTotal: total });
+        } else {
+          Sentry.logger.error("Payment failed", {
+            errorCode: presentError.code,
+            errorMessage: presentError.message,
+            cartTotal: total,
+            itemCount: cartItems.length,
+          });
+          Alert.alert("Payment failed", presentError.message);
+        }
       } else {
         Sentry.logger.info("Payment successful", {
           total: total.toFixed(2),

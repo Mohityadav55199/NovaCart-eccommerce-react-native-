@@ -13,25 +13,28 @@ const api = axios.create({
   },
 });
 
+if (!process.env.EXPO_PUBLIC_API_URL && !__DEV__) {
+  console.warn("EXPO_PUBLIC_API_URL is not set: requests will go to localhost and fail on a device");
+}
+
+// the latest Clerk getToken; one interceptor reads it so every request is authenticated exactly once
+let getAuthToken: (() => Promise<string | null>) | null = null;
+
+api.interceptors.request.use(async (config) => {
+  const token = getAuthToken ? await getAuthToken() : null;
+
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`;
+  }
+
+  return config;
+});
+
 export const useApi = () => {
   const { getToken } = useAuth();
 
   useEffect(() => {
-    const interceptor = api.interceptors.request.use(async (config) => {
-      const token = await getToken();
-
-      if (token) {
-        config.headers.Authorization = `Bearer ${token}`;
-      }
-
-      return config;
-    });
-
-    // cleanup: remove interceptor when component unmounts
-
-    return () => {
-      api.interceptors.request.eject(interceptor);
-    };
+    getAuthToken = getToken;
   }, [getToken]);
 
   return api;

@@ -1,5 +1,6 @@
 import SafeScreen from "@/components/SafeScreen";
 import { useAuth, useUser } from "@clerk/clerk-expo";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { ScrollView, Text, TouchableOpacity, View } from "react-native";
 import { Image } from "expo-image";
@@ -15,6 +16,7 @@ const MENU_ITEMS = [
 
 const ProfileScreen = () => {
   const { signOut } = useAuth();
+  const queryClient = useQueryClient();
   const { user } = useUser();
 
   const handleMenuPress = (action: (typeof MENU_ITEMS)[number]["action"]) => {
@@ -110,7 +112,10 @@ const ProfileScreen = () => {
         <TouchableOpacity
           className="mx-6 mb-3 bg-surface rounded-2xl py-5 flex-row items-center justify-center border-2 border-red-500/20"
           activeOpacity={0.8}
-          onPress={() => signOut()}
+          onPress={async () => {
+            await signOut();
+            queryClient.clear();
+          }}
         >
           <Ionicons name="log-out-outline" size={22} color="#EF4444" />
           <Text className="text-red-500 font-bold text-base ml-2">Sign Out</Text>

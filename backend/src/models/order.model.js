@@ -93,4 +93,7 @@ const orderSchema = new mongoose.Schema(
   { timestamps: true }
 );
 
+// one order per Stripe payment (sparse: orders without a payment id are allowed)
+orderSchema.index({ "paymentResult.id": 1 }, { unique: true, sparse: true });
+
 export const Order = mongoose.model("Order", orderSchema);

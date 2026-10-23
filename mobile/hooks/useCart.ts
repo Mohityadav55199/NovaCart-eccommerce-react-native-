@@ -14,7 +14,8 @@ const useCart = () => {
     queryKey: ["cart"],
     queryFn: async () => {
       const { data } = await api.get<{ cart: Cart }>("/cart");
-      return data.cart;
+      // a product deleted by the admin comes back as null: skip it so totals and lists don't crash
+      return { ...data.cart, items: data.cart.items.filter((item) => item.product) };
     },
   });
 

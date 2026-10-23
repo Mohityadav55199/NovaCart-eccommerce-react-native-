@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Cart } from "../models/cart.model.js";
 import { Product } from "../models/product.model.js";
 
@@ -24,7 +25,12 @@ export async function getCart(req, res) {
 
 export async function addToCart(req, res) {
   try {
-    const { productId, quantity = 1 } = req.body;
+    const { productId } = req.body;
+    const quantity = Number(req.body.quantity ?? 1);
+
+    if (!mongoose.isValidObjectId(productId) || !Number.isInteger(quantity) || quantity < 1) {
+      return res.status(400).json({ error: "Invalid product or quantity" });
+    }
 
     // validate product exists and has stock
     const product = await Product.findById(productId);
@@ -51,8 +57,7 @@ export async function addToCart(req, res) {
     // check if item already in the cart
     const existingItem = cart.items.find((item) => item.product.toString() === productId);
     if (existingItem) {
-      // increment quantity by 1
-      const newQuantity = existingItem.quantity + 1;
+      const newQuantity = existingItem.quantity + quantity;
       if (product.stock < newQuantity) {
         return res.status(400).json({ error: "Insufficient stock" });
       }
@@ -74,10 +79,10 @@ export async function addToCart(req, res) {
 export async function updateCartItem(req, res) {
   try {
     const { productId } = req.params;
-    const { quantity } = req.body;
+    const quantity = Number(req.body.quantity);
 
-    if (quantity < 1) {
-      return res.status(400).json({ error: "Quantity must be at least 1" });
+    if (!Number.isInteger(quantity) || quantity < 1) {
+      return res.status(400).json({ error: "Quantity must be a whole number of at least 1" });
     }
 
     const cart = await Cart.findOne({ clerkId: req.user.clerkId });

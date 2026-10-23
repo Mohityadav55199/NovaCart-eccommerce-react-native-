@@ -1,6 +1,8 @@
 import { Navigate, Route, Routes } from "react-router";
 import LoginPage from "./pages/LoginPage";
+import { useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
+import { setTokenGetter } from "./lib/axios";
 import DashboardPage from "./pages/DashboardPage";
 import ProductsPage from "./pages/ProductsPage";
 import OrdersPage from "./pages/OrdersPage";
@@ -10,7 +12,11 @@ import DashboardLayout from "./layouts/DashboardLayout";
 import PageLoader from "./components/PageLoader";
 
 function App() {
-  const { isSignedIn, isLoaded } = useAuth();
+  const { isSignedIn, isLoaded, getToken } = useAuth();
+
+  useEffect(() => {
+    setTokenGetter(getToken);
+  }, [getToken]);
 
   if (!isLoaded) return <PageLoader />;
 

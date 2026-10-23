@@ -13,8 +13,13 @@ export async function createPaymentIntent(req, res) {
     const user = req.user;
 
     // Validate cart items
-    if (!cartItems || cartItems.length === 0) {
+    if (!Array.isArray(cartItems) || cartItems.length === 0) {
       return res.status(400).json({ error: "Cart is empty" });
+    }
+
+    const requiredAddressFields = ["fullName", "streetAddress", "city", "state", "zipCode", "phoneNumber"];
+    if (!shippingAddress || requiredAddressFields.some((field) => !shippingAddress[field])) {
+      return res.status(400).json({ error: "A complete shipping address is required" });
     }
 
     // Calculate total from server-side (don't trust client - ever.)
@@ -22,23 +27,31 @@ export async function createPaymentIntent(req, res) {
     const validatedItems = [];
 
     for (const item of cartItems) {
+      const quantity = Number(item?.quantity);
+      if (!item?.product?._id || !Number.isInteger(quantity) || quantity < 1) {
+        return res.status(400).json({ error: "Invalid cart item" });
+      }
+
       const product = await Product.findById(item.product._id);
       if (!product) {
         return res.status(404).json({ error: `Product ${item.product.name} not found` });
       }
 
-      if (product.stock < item.quantity) {
+      if (product.stock < quantity) {
         return res.status(400).json({ error: `Insufficient stock for ${product.name}` });
       }
 
-      subtotal += product.price * item.quantity;
-      validatedItems.push({
-        product: product._id.toString(),
-        name: product.name,
-        price: product.price,
-        quantity: item.quantity,
-        image: product.images[0],
-      });
+      subtotal += product.price * quantity;
+      // compact on purpose: Stripe metadata values are limited to 500 characters
+      validatedItems.push({ p: product._id.toString(), q: quantity, pr: product.price });
+    }
+
+    const address = {};
+    for (const field of requiredAddressFields) address[field] = String(shippingAddress[field]);
+    const orderItemsMeta = JSON.stringify(validatedItems);
+    const addressMeta = JSON.stringify(address);
+    if (orderItemsMeta.length > 500 || addressMeta.length > 500) {
+      return res.status(400).json({ error: "Too many items or address too long for one order" });
     }
 
     const shipping = 10.0; // $10
@@ -80,8 +93,8 @@ export async function createPaymentIntent(req, res) {
       metadata: {
         clerkId: user.clerkId,
         userId: user._id.toString(),
-        orderItems: JSON.stringify(validatedItems),
-        shippingAddress: JSON.stringify(shippingAddress),
+        orderItems: orderItemsMeta,
+        shippingAddress: addressMeta,
         totalPrice: total.toFixed(2),
       },
       // in the webhooks section we will use this metadata
@@ -120,11 +133,24 @@ export async function handleWebhook(req, res) {
         return res.json({ received: true });
       }
 
-      // create order
+      // metadata only holds product id, quantity and price: look up the rest
+      const items = JSON.parse(orderItems);
+      const products = await Product.find({ _id: { $in: items.map((item) => item.p) } });
+      const productById = new Map(products.map((product) => [product._id.toString(), product]));
+
       const order = await Order.create({
         user: userId,
         clerkId,
-        orderItems: JSON.parse(orderItems),
+        orderItems: items.map((item) => {
+          const product = productById.get(item.p);
+          return {
+            product: item.p,
+            name: product?.name || "Unavailable product",
+            price: item.pr,
+            quantity: item.q,
+            image: product?.images?.[0] || "",
+          };
+        }),
         shippingAddress: JSON.parse(shippingAddress),
         paymentResult: {
           id: paymentIntent.id,
@@ -133,17 +159,21 @@ export async function handleWebhook(req, res) {
         totalPrice: parseFloat(totalPrice),
       });
 
-      // update product stock
-      const items = JSON.parse(orderItems);
+      // update product stock (never below zero)
       for (const item of items) {
-        await Product.findByIdAndUpdate(item.product, {
-          $inc: { stock: -item.quantity },
-        });
+        await Product.updateOne({ _id: item.p }, [
+          { $set: { stock: { $max: [0, { $subtract: ["$stock", item.q] }] } } },
+        ]);
       }
 
       console.log("Order created successfully:", order._id);
     } catch (error) {
+      // a concurrent delivery of the same event already created the order
+      if (error.code === 11000) return res.json({ received: true });
+
       console.error("Error creating order from webhook:", error);
+      // non-2xx makes Stripe retry the event instead of losing a paid order
+      return res.status(500).json({ error: "Failed to create order" });
     }
   }
 

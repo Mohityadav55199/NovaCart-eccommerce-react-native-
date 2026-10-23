@@ -20,10 +20,17 @@ function ProductsPage() {
   const queryClient = useQueryClient();
 
   // fetch some data
-  const { data: products = [] } = useQuery({
+  const {
+    data: products = [],
+    isLoading: productsLoading,
+    isError: productsError,
+  } = useQuery({
     queryKey: ["products"],
     queryFn: productApi.getAll,
   });
+
+  const showError = (error, fallback) =>
+    alert(error?.response?.data?.message || error?.response?.data?.error || fallback);
 
   // creating, update, deleting
   const createProductMutation = useMutation({
@@ -32,6 +39,7 @@ function ProductsPage() {
       closeModal();
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
+    onError: (error) => showError(error, "Failed to create the product"),
   });
 
   const updateProductMutation = useMutation({
@@ -40,14 +48,15 @@ function ProductsPage() {
       closeModal();
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
+    onError: (error) => showError(error, "Failed to update the product"),
   });
 
   const deleteProductMutation = useMutation({
     mutationFn: productApi.delete,
     onSuccess: () => {
-      closeModal();
       queryClient.invalidateQueries({ queryKey: ["products"] });
     },
+    onError: (error) => showError(error, "Failed to delete the product"),
   });
 
   const closeModal = () => {
@@ -131,6 +140,17 @@ function ProductsPage() {
       </div>
 
       {/* PRODUCTS GRID */}
+      {productsError && (
+        <div role="alert" className="alert alert-error">
+          <span>Failed to load products. Check that the backend is running and you are signed in as the admin.</span>
+        </div>
+      )}
+      {productsLoading && (
+        <div className="flex justify-center py-8">
+          <span className="loading loading-spinner loading-lg" />
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4">
         {products?.map((product) => {
           const status = getStockStatusBadge(product.stock);
@@ -174,9 +194,13 @@ function ProductsPage() {
                     </button>
                     <button
                       className="btn btn-square btn-ghost text-error"
-                      onClick={() => deleteProductMutation.mutate(product._id)}
+                      onClick={() => {
+                        if (window.confirm(`Delete "${product.name}"? This cannot be undone.`)) {
+                          deleteProductMutation.mutate(product._id);
+                        }
+                      }}
                     >
-                      {deleteProductMutation.isPending ? (
+                      {deleteProductMutation.isPending && deleteProductMutation.variables === product._id ? (
                         <span className="loading loading-spinner"></span>
                       ) : (
                         <Trash2Icon className="w-5 h-5" />
@@ -192,7 +216,7 @@ function ProductsPage() {
 
       {/* ADD/EDIT PRODUCT MODAL */}
 
-      <input type="checkbox" className="modal-toggle" checked={showModal} />
+      <input type="checkbox" className="modal-toggle" checked={showModal} readOnly />
 
       <div className="modal">
         <div className="modal-box max-w-2xl">
@@ -236,6 +260,7 @@ function ProductsPage() {
                   <option value="">Select category</option>
                   <option value="Electronics">Electronics</option>
                   <option value="Accessories">Accessories</option>
+                  <option value="Books">Books</option>
                   <option value="Fashion">Fashion</option>
                   <option value="Sports">Sports</option>
                 </select>
