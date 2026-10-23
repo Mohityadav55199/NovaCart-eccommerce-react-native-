@@ -6,7 +6,7 @@ import { capitalizeFirstLetter, formatDate, getStatusColor } from "@/lib/utils";
 import { Order } from "@/types";
 import { Ionicons } from "@expo/vector-icons";
 import { Image } from "expo-image";
-import { router } from "expo-router";
+import { Href, router } from "expo-router";
 import { useState } from "react";
 import { ActivityIndicator, Alert, ScrollView, Text, TouchableOpacity, View } from "react-native";
 
@@ -100,7 +100,13 @@ function OrdersScreen() {
               const firstImage = order.orderItems[0]?.image || "";
 
               return (
-                <View key={order._id} className="bg-surface rounded-3xl p-5 mb-4">
+                <TouchableOpacity
+                  key={order._id}
+                  className="bg-surface rounded-3xl p-5 mb-4"
+                  activeOpacity={0.85}
+                  // cast: typed routes learn about /order/[id] the next time `expo start` regenerates them
+                  onPress={() => router.push(`/order/${order._id}` as Href)}
+                >
                   <View className="flex-row mb-4">
                     <View className="relative">
                       <Image
@@ -153,7 +159,9 @@ function OrdersScreen() {
 
                   <View className="border-t border-background-lighter pt-3 flex-row justify-between items-center">
                     <View>
-                      <Text className="text-text-secondary text-xs mb-1">{totalItems} items</Text>
+                      <Text className="text-text-secondary text-xs mb-1">
+                        {totalItems} items · Tap for tracking
+                      </Text>
                       <Text className="text-primary font-bold text-xl">
                         ${order.totalPrice.toFixed(2)}
                       </Text>
@@ -178,7 +186,7 @@ function OrdersScreen() {
                         </TouchableOpacity>
                       ))}
                   </View>
-                </View>
+                </TouchableOpacity>
               );
             })}
           </View>

@@ -15,6 +15,8 @@ export const getStatusColor = (status: string) => {
       return "#3B82F6";
     case "pending":
       return "#F59E0B";
+    case "cancelled":
+      return "#EF4444";
     default:
       return "#666";
   }

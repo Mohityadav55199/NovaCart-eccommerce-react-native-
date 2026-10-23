@@ -36,6 +36,8 @@ export interface Address {
   isDefault: boolean;
 }
 
+export type OrderStatus = "pending" | "shipped" | "delivered" | "cancelled";
+
 export interface Order {
   _id: string;
   user: string;
@@ -53,8 +55,11 @@ export interface Order {
     id: string;
     status: string;
   };
+  pricing?: { subtotal: number; shipping: number; tax: number };
   totalPrice: number;
-  status: "pending" | "shipped" | "delivered";
+  status: OrderStatus;
+  statusHistory?: { status: string; note?: string; by?: string; at: string }[];
+  cancellation?: { reason?: string; by?: string; at?: string; refundId?: string; refundAmount?: number };
   hasReviewed: boolean;
   createdAt: string;
   updatedAt: string;
@@ -67,6 +72,12 @@ export interface OrderItem {
   price: number;
   quantity: number;
   image: string;
+  // each item is fulfilled on its own (a vendor ships their items)
+  status: OrderStatus;
+  carrier?: string;
+  trackingNumber?: string;
+  shippedAt?: string;
+  deliveredAt?: string;
 }
 
 export interface Review {

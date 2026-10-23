@@ -16,6 +16,22 @@
 - **Background jobs** with Inngest (Clerk user sync); users are also created on first request as a fallback
 - Optional error monitoring with Sentry
 
+## Roles
+
+| Role | Where | What they can do |
+|---|---|---|
+| **Customer** | Mobile app | Browse, wishlist, cart, checkout, track orders, cancel an order until it ships (full refund), review delivered orders |
+| **Vendor** | Admin site | Manage **their own** products, see only the orders and items they sell, add a carrier and tracking number, mark items shipped or delivered |
+| **Admin** | Admin site | Everything: all products, orders and customers; cancel and refund any unshipped order; promote customers to vendors (Customers page) |
+
+Admins are the emails in `ADMIN_EMAIL` (comma-separated), so removing an email there ends that person's access immediately. Everyone else signs up as a customer; an admin makes someone a vendor from the **Customers** page.
+
+## Order lifecycle
+
+1. The customer pays with Stripe. The webhook creates the order (one per payment) and reduces stock.
+2. Each order item is fulfilled on its own (a vendor ships their items): `pending`, `shipped`, `delivered`, with a carrier and tracking number. The **order status is derived** from its items and the order keeps a timeline.
+3. **Cancelling** is allowed while nothing has shipped: by the customer in the app, or by an admin. It issues a full Stripe refund, puts the stock back, and records who cancelled and why. Cancelling twice (or at the same moment) refunds once.
+
 ## Project structure
 
 | Folder | What it is | Stack |
