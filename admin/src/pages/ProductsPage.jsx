@@ -158,8 +158,8 @@ function ProductsPage() {
           return (
             <div key={product._id} className="card bg-base-100 shadow-xl">
               <div className="card-body">
-                <div className="flex items-center gap-6">
-                  <div className="avatar">
+                <div className="flex items-center gap-3 sm:gap-6">
+                  <div className="avatar shrink-0">
                     <div className="w-20 rounded-xl">
                       <img
                         src={product.images?.[0]}
@@ -173,27 +173,27 @@ function ProductsPage() {
                     </div>
                   </div>
 
-                  <div className="flex-1">
-                    <div className="flex items-start justify-between">
+                  <div className="flex-1 min-w-0">
+                    <div className="flex flex-wrap items-start justify-between gap-2">
                       <div>
                         <h3 className="card-title">{product.name}</h3>
                         <p className="text-base-content/70 text-sm">{product.category}</p>
                       </div>
-                      <div className={`badge ${status.class}`}>{status.text}</div>
+                      <div className={`badge ${status.class} h-auto whitespace-nowrap shrink-0 py-1`}>{status.text}</div>
                     </div>
-                    <div className="flex items-center gap-6 mt-4">
+                    <div className="flex items-center gap-6 mt-4 flex-wrap">
                       <div>
                         <p className="text-xs text-base-content/70">Price</p>
                         <p className="font-bold text-lg">${product.price}</p>
                       </div>
                       <div>
                         <p className="text-xs text-base-content/70">Stock</p>
-                        <p className="font-bold text-lg">{product.stock} units</p>
+                        <p className="font-bold text-lg whitespace-nowrap">{product.stock} units</p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="card-actions">
+                  <div className="card-actions shrink-0 flex-col sm:flex-row">
                     <button
                       className="btn btn-square btn-ghost"
                       onClick={() => handleEdit(product)}
