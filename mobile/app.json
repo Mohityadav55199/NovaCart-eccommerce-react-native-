@@ -1,6 +1,6 @@
 {
   "expo": {
-    "name": "NovaCart-eccommerce react native",
+    "name": "NovaCart",
     "slug": "novacart-eccommerce",
     "version": "1.0.0",
     "orientation": "portrait",
@@ -41,14 +41,7 @@
           }
         }
       ],
-      [
-        "@sentry/react-native/expo",
-        {
-          "url": "https://sentry.io/",
-          "project": "ecommerce-tut",
-          "organization": "codesistency-gs"
-        }
-      ]
+      "@sentry/react-native/expo"
     ],
     "experiments": {
       "typedRoutes": true,

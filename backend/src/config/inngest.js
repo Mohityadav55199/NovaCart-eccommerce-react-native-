@@ -1,8 +1,9 @@
+import { buildUserDoc } from "../utils/user.js";
 import { Inngest } from "inngest";
 import { connectDB } from "./db.js";
 import { User } from "../models/user.model.js";
 
-export const inngest = new Inngest({ id: "ecommerce-app" });
+export const inngest = new Inngest({ id: "novacart" });
 
 const syncUser = inngest.createFunction(
   { id: "sync-user" },
@@ -11,14 +12,13 @@ const syncUser = inngest.createFunction(
     await connectDB();
     const { id, email_addresses, first_name, last_name, image_url } = event.data;
 
-    const newUser = {
+    const newUser = buildUserDoc({
       clerkId: id,
       email: email_addresses[0]?.email_address,
-      name: [first_name, last_name].filter(Boolean).join(" ") || "User",
+      firstName: first_name,
+      lastName: last_name,
       imageUrl: image_url,
-      addresses: [],
-      wishlist: [],
-    };
+    });
 
     // upsert: protectRoute may have created the user already
     await User.updateOne({ clerkId: id }, { $setOnInsert: newUser }, { upsert: true });

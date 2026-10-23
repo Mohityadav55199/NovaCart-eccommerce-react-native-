@@ -9,12 +9,14 @@
     },
     "preview": {
       "distribution": "internal",
+      "env": { "SENTRY_DISABLE_AUTO_UPLOAD": "true" },
       "android": {
         "buildType": "apk"
       }
     },
     "production": {
-      "autoIncrement": true
+      "autoIncrement": true,
+      "env": { "SENTRY_DISABLE_AUTO_UPLOAD": "true" }
     }
   },
   "submit": {

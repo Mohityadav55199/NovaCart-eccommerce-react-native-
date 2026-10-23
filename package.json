@@ -1,7 +1,7 @@
 {
-  "name": "novacart-ecommerce-react-native",
+  "name": "novacart",
   "version": "1.0.0",
-  "description": "",
+  "description": "NovaCart: full-stack e-commerce (React Native app, admin dashboard and REST API)",
   "main": "index.js",
   "engines": {
     "node": ">=20.0.0"
@@ -20,7 +20,7 @@
     "url": "git+https://github.com/Mohityadav55199/NovaCart-eccommerce-react-native-.git"
   },
   "keywords": [],
-  "author": "",
+  "author": "Mohit Yadav (mohityadav55199)",
   "license": "ISC",
   "type": "commonjs",
   "bugs": {

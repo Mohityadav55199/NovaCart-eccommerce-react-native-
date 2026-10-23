@@ -1,6 +1,7 @@
 import { clerkClient, requireAuth } from "@clerk/express";
 import { User } from "../models/user.model.js";
 import { ENV } from "../config/env.js";
+import { buildUserDoc } from "../utils/user.js";
 
 // creates the db user from the Clerk profile when the Inngest sync hasn't run (or is down)
 const createUserFromClerk = async (clerkId) => {
@@ -9,14 +10,15 @@ const createUserFromClerk = async (clerkId) => {
   if (!email) return null;
 
   try {
-    return await User.create({
-      clerkId,
-      email,
-      name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User",
-      imageUrl: clerkUser.imageUrl,
-      addresses: [],
-      wishlist: [],
-    });
+    return await User.create(
+      buildUserDoc({
+        clerkId,
+        email,
+        firstName: clerkUser.firstName,
+        lastName: clerkUser.lastName,
+        imageUrl: clerkUser.imageUrl,
+      })
+    );
   } catch (error) {
     // concurrent first requests (or the Inngest sync) already created it
     if (error.code === 11000 && error.keyPattern?.clerkId) return User.findOne({ clerkId });

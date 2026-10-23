@@ -2,11 +2,9 @@ import { useAuth } from "@clerk/clerk-expo";
 import axios from "axios";
 import { useEffect } from "react";
 
-// localhost will work in simulator
-const API_URL = "http://localhost:3000/api";
-
-// prod url will work in your physical device
-// const API_URL = "https://expo-ecommerce-th4ln.sevalla.app/api"
+// set EXPO_PUBLIC_API_URL in mobile/.env (local) or as an EAS env var (builds).
+// localhost only works in an emulator; use your LAN IP or the deployed backend on a real device
+const API_URL = process.env.EXPO_PUBLIC_API_URL ?? "http://localhost:3000/api";
 
 const api = axios.create({
   baseURL: API_URL,

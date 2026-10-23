@@ -1,0 +1,41 @@
+# Render Blueprint: deploys the NovaCart API (Express + MongoDB)
+# Render dashboard -> New -> Blueprint -> pick this repo. Secrets marked `sync: false` are entered in the dashboard.
+services:
+  - type: web
+    name: novacart-api
+    runtime: node
+    rootDir: backend
+    plan: free
+    buildCommand: npm install
+    startCommand: npm start
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_VERSION
+        value: 20
+      - key: NODE_ENV
+        value: production
+      - key: DB_URL
+        sync: false
+      - key: CLERK_PUBLISHABLE_KEY
+        sync: false
+      - key: CLERK_SECRET_KEY
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      # the deployed admin URL (Vercel), used for CORS
+      - key: CLIENT_URL
+        sync: false
+      - key: CLOUDINARY_CLOUD_NAME
+        sync: false
+      - key: CLOUDINARY_API_KEY
+        sync: false
+      - key: CLOUDINARY_API_SECRET
+        sync: false
+      - key: STRIPE_PUBLISHABLE_KEY
+        sync: false
+      - key: STRIPE_SECRET_KEY
+        sync: false
+      - key: STRIPE_WEBHOOK_SECRET
+        sync: false
+      - key: INNGEST_SIGNING_KEY
+        sync: false
