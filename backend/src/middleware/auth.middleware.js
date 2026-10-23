@@ -58,9 +58,22 @@ export const protectRoute = [
 ];
 
 // "admin" comes only from ADMIN_EMAIL (remove an email there and its access ends immediately);
-// "vendor" and "customer" are stored on the user
-export const getRole = (user) =>
-  adminEmails.includes(user.email.toLowerCase()) ? "admin" : user.role || "customer";
+// "vendor" and "customer" are stored on the user, and one person can have both
+export const isAdminEmail = (email) => adminEmails.includes((email || "").toLowerCase());
+
+export const getRoles = (user) => {
+  const roles = new Set(["customer", ...(user.roles || [])]);
+  if (isAdminEmail(user.email)) roles.add("admin");
+  return [...roles];
+};
+
+// the highest role decides what the admin site shows: admin > vendor > customer
+export const getRole = (user) => {
+  const roles = getRoles(user);
+  if (roles.includes("admin")) return "admin";
+  if (roles.includes("vendor")) return "vendor";
+  return "customer";
+};
 
 export const requireRole =
   (...roles) =>

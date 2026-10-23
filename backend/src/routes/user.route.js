@@ -2,8 +2,10 @@ import { Router } from "express";
 import {
   addAddress,
   addToWishlist,
+  becomeVendor,
   deleteAddress,
   getAddresses,
+  getMe,
   getWishlist,
   removeFromWishlist,
   updateAddress,
@@ -13,6 +15,10 @@ import { protectRoute } from "../middleware/auth.middleware.js";
 const router = Router();
 
 router.use(protectRoute);
+
+// who am I (roles) and start selling
+router.get("/me", getMe);
+router.post("/become-vendor", becomeVendor);
 
 // address routes
 router.post("/addresses", addAddress);

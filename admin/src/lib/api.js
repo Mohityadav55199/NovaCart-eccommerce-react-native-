@@ -46,6 +46,17 @@ export const orderApi = {
   },
 };
 
+export const userApi = {
+  me: async () => {
+    const { data } = await axiosInstance.get("/users/me");
+    return data.user;
+  },
+  becomeVendor: async (storeName) => {
+    const { data } = await axiosInstance.post("/users/become-vendor", { storeName });
+    return data.user;
+  },
+};
+
 export const adminApi = {
   check: async () => {
     const { data } = await axiosInstance.get("/admin/check");

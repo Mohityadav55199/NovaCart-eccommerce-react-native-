@@ -1,34 +1,22 @@
 import { createElement, useState } from "react";
+import { Link } from "react-router";
 import { SignIn } from "@clerk/clerk-react";
-import { ShieldCheckIcon, StoreIcon } from "lucide-react";
-import { LOGIN_AS_KEY } from "../lib/loginAs";
+import { ShieldCheckIcon, ShoppingBagIcon, StoreIcon } from "lucide-react";
+import { readMode, writeMode } from "../lib/mode";
 
-
-const ROLES = [
-  { id: "admin", label: "Admin", hint: "Manage the whole store", icon: ShieldCheckIcon },
-  { id: "vendor", label: "Vendor", hint: "Manage your products and orders", icon: StoreIcon },
+const MODES = [
+  { id: "customer", label: "Customer", hint: "Your account and orders", icon: ShoppingBagIcon },
+  { id: "vendor", label: "Vendor", hint: "Sell and manage your store. Admins sign in here too.", icon: StoreIcon },
 ];
 
-const readSaved = () => {
-  try {
-    return sessionStorage.getItem(LOGIN_AS_KEY) || "admin";
-  } catch {
-    return "admin";
-  }
-};
-
-// The choice only says which workspace you expect. The server decides your real role,
-// so picking "Admin" with a vendor account never grants anything (AdminGate shows the mismatch).
+// The choice is only which workspace to open: the same account can use either on different days.
+// What the account may actually do is decided by the server, never by this choice.
 function LoginPage() {
-  const [loginAs, setLoginAs] = useState(readSaved);
+  const [mode, setMode] = useState(() => readMode() || "vendor");
 
   const choose = (id) => {
-    setLoginAs(id);
-    try {
-      sessionStorage.setItem(LOGIN_AS_KEY, id);
-    } catch {
-      /* private mode: the choice just isn't remembered */
-    }
+    setMode(id);
+    writeMode(id);
   };
 
   return (
@@ -36,15 +24,15 @@ function LoginPage() {
       <div className="w-full max-w-sm">
         <p className="text-sm text-center opacity-70 mb-2">Sign in as</p>
         <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Sign in as">
-          {ROLES.map(({ id, label, hint, icon }) => (
+          {MODES.map(({ id, label, hint, icon }) => (
             <button
               key={id}
               type="button"
               role="radio"
-              aria-checked={loginAs === id}
+              aria-checked={mode === id}
               onClick={() => choose(id)}
               className={`rounded-xl border p-3 text-left transition ${
-                loginAs === id ? "border-primary bg-primary/10" : "border-base-300 hover:border-primary/50"
+                mode === id ? "border-primary bg-primary/10" : "border-base-300 hover:border-primary/50"
               }`}
             >
               {createElement(icon, { className: "size-5 mb-1" })}
@@ -53,12 +41,19 @@ function LoginPage() {
             </button>
           ))}
         </div>
-        <p className="text-xs text-center opacity-60 mt-2">
-          Shopping as a customer? Use the NovaCart mobile app.
+        <p className="text-xs text-center opacity-60 mt-2 flex items-center justify-center gap-1">
+          <ShieldCheckIcon className="size-3.5" /> Your role comes from your account, not from this choice.
         </p>
       </div>
 
-      <SignIn />
+      <SignIn signUpUrl="/register" />
+
+      <p className="text-sm opacity-70">
+        New here?{" "}
+        <Link to="/register" className="link link-primary">
+          Create an account
+        </Link>
+      </p>
     </div>
   );
 }

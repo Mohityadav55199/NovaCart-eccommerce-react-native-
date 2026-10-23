@@ -59,11 +59,16 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
-    // "admin" is not stored: admins are the emails in ADMIN_EMAIL (see auth.middleware.js)
-    role: {
-      type: String,
+    // everyone is a customer; "vendor" is added when they start selling (anyone can).
+    // "admin" is never stored: admins are the emails in ADMIN_EMAIL (see auth.middleware.js)
+    roles: {
+      type: [String],
       enum: ["customer", "vendor"],
-      default: "customer",
+      default: ["customer"],
+    },
+    vendorProfile: {
+      storeName: { type: String, trim: true, maxlength: 60 },
+      since: Date,
     },
     addresses: [addressSchema],
     wishlist: [

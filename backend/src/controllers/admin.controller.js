@@ -4,7 +4,7 @@ import cloudinary from "../config/cloudinary.js";
 import { Product } from "../models/product.model.js";
 import { Order } from "../models/order.model.js";
 import { User } from "../models/user.model.js";
-import { getRole } from "../middleware/auth.middleware.js";
+import { getRole, getRoles } from "../middleware/auth.middleware.js";
 import {
   OrderError,
   cancelOrder,
@@ -283,7 +283,7 @@ export async function cancelOrderAsAdmin(req, res) {
 export async function getAllCustomers(_, res) {
   try {
     const users = await User.find().sort({ createdAt: -1 }); // latest user first
-    const customers = users.map((user) => ({ ...user.toObject(), role: getRole(user) }));
+    const customers = users.map((user) => ({ ...user.toObject(), role: getRole(user), roles: getRoles(user) }));
     res.status(200).json({ customers });
   } catch (error) {
     console.error("Error fetching customers:", error);
@@ -308,10 +308,19 @@ export async function setUserRole(req, res) {
       return res.status(400).json({ error: "Admins are managed through ADMIN_EMAIL, not here" });
     }
 
-    user.role = role;
+    // "vendor" adds the vendor role (they stay a customer too); "customer" removes it.
+    // Their products stay in the store, and an admin can still manage them.
+    const withoutVendor = user.roles.filter((r) => r !== "vendor");
+    user.roles = role === "vendor" ? [...withoutVendor, "vendor"] : withoutVendor;
+    if (role === "vendor" && !user.vendorProfile?.storeName) {
+      user.vendorProfile = { storeName: user.name, since: new Date() };
+    }
     await user.save();
 
-    res.status(200).json({ message: `${user.name} is now a ${role}`, user: { ...user.toObject(), role } });
+    res.status(200).json({
+      message: `${user.name} is now a ${role}`,
+      user: { ...user.toObject(), role: getRole(user), roles: getRoles(user) },
+    });
   } catch (error) {
     console.error("Error in setUserRole:", error);
     res.status(500).json({ error: "Internal server error" });

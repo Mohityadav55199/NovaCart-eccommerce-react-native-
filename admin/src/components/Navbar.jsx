@@ -1,5 +1,6 @@
 import { UserButton } from "@clerk/clerk-react";
 import { useLocation } from "react-router";
+import { useRole } from "../lib/role";
 
 import {
   ClipboardListIcon,
@@ -19,6 +20,7 @@ export const NAVIGATION = [
 
 function Navbar() {
   const location = useLocation();
+  const { setMode } = useRole();
 
   return (
     <div className="navbar w-full bg-base-300">
@@ -31,6 +33,10 @@ function Navbar() {
           {NAVIGATION.find((item) => item.path === location.pathname)?.name || "Dashboard"}
         </h1>
       </div>
+
+      <button className="btn btn-ghost btn-sm mr-2" onClick={() => setMode("customer")}>
+        Customer view
+      </button>
 
       <div className="mr-5">
         <UserButton />

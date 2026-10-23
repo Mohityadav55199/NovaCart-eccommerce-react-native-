@@ -1,5 +1,6 @@
 import { Navigate, Route, Routes } from "react-router";
 import LoginPage from "./pages/LoginPage";
+import RegisterPage from "./pages/RegisterPage";
 import { lazy, Suspense, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { setTokenGetter } from "./lib/axios";
@@ -32,6 +33,7 @@ function App() {
     <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/login" element={isSignedIn ? <Navigate to={"/dashboard"} /> : <LoginPage />} />
+      <Route path="/register" element={isSignedIn ? <Navigate to={"/dashboard"} /> : <RegisterPage />} />
 
       <Route path="/" element={
           isSignedIn ? (

@@ -11,12 +11,12 @@ function AccessDenied() {
       <div className="card bg-base-100 shadow-xl max-w-md w-full">
         <div className="card-body items-center text-center gap-3">
           <ShieldAlertIcon className="size-14 text-error" />
-          <h1 className="card-title text-2xl">Admin and vendor access only</h1>
+          <h1 className="card-title text-2xl">We couldn&apos;t verify this account</h1>
           <p className="text-base-content/70">
             {user?.primaryEmailAddress?.emailAddress
-              ? `${user.primaryEmailAddress.emailAddress} doesn't have access to the NovaCart admin.`
-              : "This account doesn't have access to the NovaCart admin."}{" "}
-            Customers shop in the NovaCart mobile app.
+              ? `The server did not accept the sign-in for ${user.primaryEmailAddress.emailAddress}.`
+              : "The server did not accept this sign-in."}{" "}
+            Sign out and try again. If it keeps happening, contact the store owner.
           </p>
           <button className="btn btn-primary mt-2" onClick={() => signOut({ redirectUrl: "/login" })}>
             Sign out

@@ -1,4 +1,5 @@
 import { User } from "../models/user.model.js";
+import { getRole, getRoles } from "../middleware/auth.middleware.js";
 
 export async function addAddress(req, res) {
   try {
@@ -150,6 +151,42 @@ export async function getWishlist(req, res) {
     res.status(200).json({ wishlist: user.wishlist });
   } catch (error) {
     console.error("Error in getWishlist controller:", error);
+    res.status(500).json({ error: "Internal server error" });
+  }
+}
+
+
+const describeMe = (user) => ({
+  _id: user._id,
+  name: user.name,
+  email: user.email,
+  imageUrl: user.imageUrl,
+  role: getRole(user), // highest: "admin" | "vendor" | "customer"
+  roles: getRoles(user),
+  storeName: user.vendorProfile?.storeName || "",
+});
+
+// the web portal asks this after sign-in to decide what to show
+export async function getMe(req, res) {
+  res.status(200).json({ user: describeMe(req.user) });
+}
+
+// anyone can start selling: adds the vendor role (a person can be a customer and a vendor)
+export async function becomeVendor(req, res) {
+  try {
+    const storeName = String(req.body?.storeName || "").trim();
+    if (storeName.length < 2 || storeName.length > 60) {
+      return res.status(400).json({ error: "Store name must be 2 to 60 characters" });
+    }
+
+    const user = req.user;
+    if (!user.roles.includes("vendor")) user.roles.push("vendor");
+    user.vendorProfile = { storeName, since: user.vendorProfile?.since || new Date() };
+    await user.save();
+
+    res.status(200).json({ message: "You are now a vendor", user: describeMe(user) });
+  } catch (error) {
+    console.error("Error in becomeVendor:", error);
     res.status(500).json({ error: "Internal server error" });
   }
 }

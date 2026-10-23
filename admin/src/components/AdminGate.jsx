@@ -1,15 +1,17 @@
 import { useState } from "react";
-import { useAuth, useClerk } from "@clerk/clerk-react";
+import { useAuth } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
-import { adminApi } from "../lib/api";
+import { userApi } from "../lib/api";
 import { describeError } from "../lib/errors";
+import { readMode, writeMode } from "../lib/mode";
 import { RoleContext } from "../lib/role";
-import { LOGIN_AS_KEY } from "../lib/loginAs";
 import AccessDenied from "./AccessDenied";
+import BecomeVendor from "./BecomeVendor";
+import CustomerHome from "./CustomerHome";
 import PageLoader from "./PageLoader";
 
-// remember the verified role per user so a returning visit renders at once (it is re-checked in the background)
-const cacheKey = (userId) => `novacart:role:${userId}`;
+// remember the verified account per user so a returning visit renders at once (it is re-checked in the background)
+const cacheKey = (userId) => `novacart:me:${userId}`;
 const readCached = (userId) => {
   try {
     return JSON.parse(localStorage.getItem(cacheKey(userId)) || "null");
@@ -19,111 +21,70 @@ const readCached = (userId) => {
 };
 const writeCached = (userId, value) => {
   try {
-    localStorage.setItem(cacheKey(userId), JSON.stringify(value));
+    if (value) localStorage.setItem(cacheKey(userId), JSON.stringify(value));
+    else localStorage.removeItem(cacheKey(userId));
   } catch {
     /* storage unavailable: just skip the shortcut */
   }
 };
-const readLoginAs = () => {
-  try {
-    return sessionStorage.getItem(LOGIN_AS_KEY);
-  } catch {
-    return null;
-  }
-};
-const clearLoginAs = () => {
-  try {
-    sessionStorage.removeItem(LOGIN_AS_KEY);
-  } catch {
-    /* ignore */
-  }
-};
 
-// asks the API whether this account is an admin or vendor before any admin screen is rendered.
-// The API still enforces every permission: this is only what the screen shows.
+// Decides what to show after sign-in, from what the API says about the account:
+//  - "customer" view: the customer home (offers "become a vendor" or "open dashboard")
+//  - "vendor" view: the dashboard for vendors and admins, or the become-a-vendor form for everyone else
+// The view is only a choice of screen; the API checks every request itself.
 function AdminGate({ children }) {
   const { userId } = useAuth();
-  const { signOut } = useClerk();
-  const [acceptedRole, setAcceptedRole] = useState(false);
+  const [mode, setModeState] = useState(() => readMode() || "vendor");
 
-  const { data, isLoading, isError, error, refetch } = useQuery({
-    queryKey: ["adminCheck", userId],
+  const setMode = (next) => {
+    writeMode(next);
+    setModeState(next);
+  };
+
+  const { data: me, isLoading, isError, error, refetch } = useQuery({
+    queryKey: ["me", userId],
     queryFn: async () => {
-      const result = await adminApi.check();
+      const result = await userApi.me();
       writeCached(userId, result);
       return result;
     },
-    // a cached answer shows the dashboard immediately; initialDataUpdatedAt 0 makes it refetch right away
+    // a cached answer shows the screen immediately; initialDataUpdatedAt 0 makes it refetch right away
     initialData: () => readCached(userId) ?? undefined,
     initialDataUpdatedAt: 0,
-    // a 401/403 is a definite answer; only retry network hiccups (e.g. Render waking up)
+    // 401/403 are definite answers; only retry network hiccups (e.g. Render waking up)
     retry: (failureCount, err) => ![401, 403].includes(err?.response?.status) && failureCount < 3,
     staleTime: 5 * 60 * 1000,
   });
 
   if (isLoading) return <PageLoader />;
 
-  if (isError) {
-    if ([401, 403].includes(error?.response?.status)) {
-      writeCached(userId, null);
-      return <AccessDenied />;
-    }
-
-    // the cached role is still usable while the API is unreachable
-    if (!data) {
-      return (
-        <div className="min-h-screen flex items-center justify-center p-6">
-          <div className="text-center space-y-3">
-            <p className="text-error">Couldn&apos;t reach the server ({describeError(error)}).</p>
-            <p className="text-sm text-base-content/70">The API may be waking up, which can take up to a minute.</p>
-            <button className="btn btn-primary" onClick={() => refetch()}>
-              Try again
-            </button>
-          </div>
-        </div>
-      );
-    }
+  if (isError && [401, 403].includes(error?.response?.status)) {
+    writeCached(userId, null);
+    return <AccessDenied />;
   }
 
-  // signed in with a different role than the one picked on the sign-in page
-  const wanted = readLoginAs();
-  if (wanted && wanted !== data.role && !acceptedRole) {
+  // unreachable and nothing cached
+  if (!me) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="card bg-base-100 shadow-xl max-w-md w-full">
-          <div className="card-body items-center text-center gap-3">
-            <h1 className="card-title text-2xl">This account is a {data.role}</h1>
-            <p className="text-base-content/70">
-              You chose to sign in as {wanted}, but this account has {data.role} access. Roles are set by the store
-              owner, so you can continue as a {data.role} or sign in with a different account.
-            </p>
-            <button
-              className="btn btn-primary"
-              onClick={() => {
-                clearLoginAs();
-                setAcceptedRole(true);
-              }}
-            >
-              Continue as {data.role}
-            </button>
-            <button
-              className="btn btn-ghost btn-sm"
-              onClick={() => {
-                clearLoginAs();
-                signOut({ redirectUrl: "/login" });
-              }}
-            >
-              Sign out
-            </button>
-          </div>
+        <div className="text-center space-y-3">
+          <p className="text-error">Couldn&apos;t reach the server ({describeError(error)}).</p>
+          <p className="text-sm text-base-content/70">The API may be waking up, which can take up to a minute.</p>
+          <button className="btn btn-primary" onClick={() => refetch()}>
+            Try again
+          </button>
         </div>
       </div>
     );
   }
 
-  if (wanted) clearLoginAs(); // matched: nothing more to ask
+  const canSell = me.roles.includes("vendor") || me.role === "admin";
 
-  return <RoleContext.Provider value={{ role: data.role, name: data.name }}>{children}</RoleContext.Provider>;
+  if (mode === "customer") return <CustomerHome me={me} canSell={canSell} setMode={setMode} />;
+
+  if (!canSell) return <BecomeVendor me={me} setMode={setMode} />;
+
+  return <RoleContext.Provider value={{ role: me.role, name: me.name, setMode }}>{children}</RoleContext.Provider>;
 }
 
 export default AdminGate;
