@@ -1,4 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
+import Avatar from "../components/Avatar";
 import { customerApi } from "../lib/api";
 import { formatDate } from "../lib/utils";
 
@@ -51,15 +52,7 @@ function CustomersPage() {
                   {customers.map((customer) => (
                     <tr key={customer._id}>
                       <td className="flex items-center gap-3">
-                        <div className="avatar placeholder">
-                          <div className="bg-primary text-primary-content rounded-full w-12">
-                            <img
-                              src={customer.imageUrl}
-                              alt={customer.name}
-                              className="w-12 h-12 rounded-full"
-                            />
-                          </div>
-                        </div>
+                        <Avatar src={customer.imageUrl} name={customer.name} />
                         <div className="font-semibold">{customer.name}</div>
                       </td>
 

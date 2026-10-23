@@ -1,6 +1,7 @@
 import { useUser } from "@clerk/clerk-react";
 import { ShoppingBagIcon } from "lucide-react";
-import { Link, useLocation } from "react-router";
+import { Link, useLocation } from "react-router";
+import Avatar from "./Avatar";
 import { NAVIGATION } from "./Navbar";
 
 function Sidebar() {
@@ -43,7 +44,7 @@ function Sidebar() {
         <div className="p-4 w-full">
           <div className="flex items-center gap-3">
             <div className="avatar shrink-0">
-              <img src={user?.imageUrl} alt={user?.name} className="w-10 h-10 rounded-full" />
+              <Avatar src={user?.imageUrl} name={user?.fullName || user?.firstName || ""} className="w-10 h-10" />
             </div>
 
             <div className="flex-1 min-w-0 is-drawer-close:hidden">

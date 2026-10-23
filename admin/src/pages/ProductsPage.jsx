@@ -161,7 +161,15 @@ function ProductsPage() {
                 <div className="flex items-center gap-6">
                   <div className="avatar">
                     <div className="w-20 rounded-xl">
-                      <img src={product.images[0]} alt={product.name} />
+                      <img
+                        src={product.images?.[0]}
+                        alt={product.name}
+                        onError={(e) => {
+                          e.currentTarget.onerror = null;
+                          e.currentTarget.src =
+                            "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='80' height='80'><rect width='80' height='80' fill='%23374151'/><text x='40' y='46' font-size='14' text-anchor='middle' fill='%239ca3af'>No image</text></svg>";
+                        }}
+                      />
                     </div>
                   </div>
 
