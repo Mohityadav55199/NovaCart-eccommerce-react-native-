@@ -23,8 +23,8 @@ export const productApi = {
 };
 
 export const orderApi = {
-  getAll: async () => {
-    const { data } = await axiosInstance.get("/admin/orders");
+  getAll: async (params) => {
+    const { data } = await axiosInstance.get("/admin/orders", { params });
     return data;
   },
 

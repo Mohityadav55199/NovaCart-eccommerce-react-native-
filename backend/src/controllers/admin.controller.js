@@ -176,10 +176,15 @@ export async function getAllOrders(req, res) {
   try {
     const filter = isVendor(req) ? { "orderItems.vendor": req.user._id } : {};
 
-    const orders = await Order.find(filter)
+    // ?limit=5 is used by the dashboard so it doesn't download every order
+    const limit = Math.min(Math.max(parseInt(req.query.limit, 10) || 0, 0), 200);
+
+    let query = Order.find(filter)
       .populate("user", "name email")
       .populate("orderItems.product")
       .sort({ createdAt: -1 });
+    if (limit) query = query.limit(limit);
+    const orders = await query;
 
     if (!isVendor(req)) return res.status(200).json({ orders });
 

@@ -44,9 +44,9 @@ app.use(
 );
 
 // adds the auth object under req.auth; Stripe's webhook is verified by its signature instead
-app.use((req, res, next) =>
-  req.originalUrl === "/api/payment/webhook" ? next() : clerkMiddleware()(req, res, next)
-);
+const clerk = clerkMiddleware();
+const skipClerk = new Set(["/api/payment/webhook", "/api/health"]);
+app.use((req, res, next) => (skipClerk.has(req.originalUrl) ? next() : clerk(req, res, next)));
 
 app.use("/api/inngest", serve({ client: inngest, functions }));
 

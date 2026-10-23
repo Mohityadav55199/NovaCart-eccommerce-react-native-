@@ -7,8 +7,9 @@ import { capitalizeText, formatDate, getOrderStatusBadge } from "../lib/utils";
 
 function DashboardPage() {
   const { data: ordersData, isLoading: ordersLoading, isError: ordersError, error: ordersErr } = useQuery({
-    queryKey: ["orders"],
-    queryFn: orderApi.getAll,
+    // only the latest few are shown here; the key still starts with "orders" so order changes refresh it
+    queryKey: ["orders", "recent"],
+    queryFn: () => orderApi.getAll({ limit: 5 }),
   });
 
   const { data: statsData, isLoading: statsLoading, isError: statsError, error: statsErr } = useQuery({

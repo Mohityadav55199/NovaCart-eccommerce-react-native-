@@ -1,12 +1,12 @@
 import { Navigate, Route, Routes } from "react-router";
 import LoginPage from "./pages/LoginPage";
-import { useEffect } from "react";
+import { lazy, Suspense, useEffect } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { setTokenGetter } from "./lib/axios";
-import DashboardPage from "./pages/DashboardPage";
-import ProductsPage from "./pages/ProductsPage";
-import OrdersPage from "./pages/OrdersPage";
-import CustomersPage from "./pages/CustomersPage";
+const DashboardPage = lazy(() => import("./pages/DashboardPage"));
+const ProductsPage = lazy(() => import("./pages/ProductsPage"));
+const OrdersPage = lazy(() => import("./pages/OrdersPage"));
+const CustomersPage = lazy(() => import("./pages/CustomersPage"));
 import DashboardLayout from "./layouts/DashboardLayout";
 
 import PageLoader from "./components/PageLoader";
@@ -29,6 +29,7 @@ function App() {
   if (!isLoaded) return <PageLoader />;
 
   return (
+    <Suspense fallback={<PageLoader />}>
     <Routes>
       <Route path="/login" element={isSignedIn ? <Navigate to={"/dashboard"} /> : <LoginPage />} />
 
@@ -48,6 +49,7 @@ function App() {
         <Route path="customers" element={<CustomersRoute />} />
       </Route>
     </Routes>
+    </Suspense>
   );
 }
 
