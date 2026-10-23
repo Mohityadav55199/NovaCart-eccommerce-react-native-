@@ -3,8 +3,10 @@ import { useAuth } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
 import { userApi } from "../lib/api";
 import { describeError } from "../lib/errors";
+import { setActiveMode } from "../lib/axios";
 import { readMode, writeMode } from "../lib/mode";
 import { RoleContext } from "../lib/role";
+import { buildRoleValue, hasDashboard } from "../lib/roleValue";
 import AccessDenied from "./AccessDenied";
 import BecomeVendor from "./BecomeVendor";
 import CustomerHome from "./CustomerHome";
@@ -34,10 +36,15 @@ const writeCached = (userId, value) => {
 // The view is only a choice of screen; the API checks every request itself.
 function AdminGate({ children }) {
   const { userId } = useAuth();
-  const [mode, setModeState] = useState(() => readMode() || "vendor");
+  const [mode, setModeState] = useState(() => {
+    const initial = readMode() || "vendor";
+    setActiveMode(initial);
+    return initial;
+  });
 
   const setMode = (next) => {
     writeMode(next);
+    setActiveMode(next);
     setModeState(next);
   };
 
@@ -81,13 +88,13 @@ function AdminGate({ children }) {
     );
   }
 
-  const canSell = me.roles.includes("vendor") || me.role === "admin";
+  const canSell = hasDashboard(me);
 
   if (mode === "customer") return <CustomerHome me={me} canSell={canSell} setMode={setMode} />;
 
   if (!canSell) return <BecomeVendor me={me} setMode={setMode} />;
 
-  return <RoleContext.Provider value={{ role: me.role, name: me.name, setMode }}>{children}</RoleContext.Provider>;
+  return <RoleContext.Provider value={buildRoleValue(me, setMode)}>{children}</RoleContext.Provider>;
 }
 
 export default AdminGate;

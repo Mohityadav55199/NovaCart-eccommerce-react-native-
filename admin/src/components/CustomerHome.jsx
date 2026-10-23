@@ -28,7 +28,7 @@ function CustomerHome({ me, canSell, setMode }) {
 
           {canSell ? (
             <button className="btn btn-primary w-full" onClick={() => setMode("vendor")}>
-              <StoreIcon className="size-4" /> Open {me.role === "admin" ? "admin" : "vendor"} dashboard
+              <StoreIcon className="size-4" /> Open {me.role} dashboard
             </button>
           ) : (
             <div className="w-full space-y-2">

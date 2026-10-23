@@ -7,7 +7,7 @@ import { NAVIGATION } from "./Navbar";
 
 function Sidebar() {
   const location = useLocation();
-  const { role } = useRole();
+  const { role, can } = useRole();
   const { user } = useUser();
 
   return (
@@ -28,7 +28,7 @@ function Sidebar() {
         </div>
 
         <ul className="menu w-full grow flex flex-col gap-2">
-          {NAVIGATION.filter((item) => item.roles.includes(role)).map((item) => {
+          {NAVIGATION.filter((item) => can(item.perm)).map((item) => {
             const isActive = location.pathname === item.path;
             return (
               <li key={item.path}>

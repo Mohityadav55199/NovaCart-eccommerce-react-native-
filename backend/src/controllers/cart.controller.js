@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { Cart } from "../models/cart.model.js";
 import { Product } from "../models/product.model.js";
+import { ON_SALE } from "./product.controller.js";
 
 export async function getCart(req, res) {
   try {
@@ -33,7 +34,7 @@ export async function addToCart(req, res) {
     }
 
     // validate product exists and has stock
-    const product = await Product.findById(productId);
+    const product = await Product.findOne({ _id: productId, ...ON_SALE });
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }

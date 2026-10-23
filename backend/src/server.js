@@ -2,10 +2,8 @@ import express from "express";
 import fs from "fs";
 import path from "path";
 import { clerkMiddleware } from "@clerk/express";
-import { serve } from "inngest/express";
 import cors from "cors";
-
-import { functions, inngest } from "./config/inngest.js";
+import helmet from "helmet";
 
 import { ENV } from "./config/env.js";
 import { connectDB } from "./config/db.js";
@@ -17,16 +15,28 @@ import reviewRoutes from "./routes/review.route.js";
 import productRoutes from "./routes/product.route.js";
 import cartRoutes from "./routes/cart.route.js";
 import paymentRoutes from "./routes/payment.route.js";
+import vendorRoutes from "./routes/vendor.route.js";
+import { handleClerkWebhook } from "./controllers/webhook.controller.js";
+import { apiLimiter } from "./middleware/security.middleware.js";
+import { settleAllDuePayouts } from "./services/payout.service.js";
 
 const app = express();
 
 const __dirname = path.resolve();
 
+// behind Render's proxy: use the real client IP (rate limits) and know the request was https
+app.set("trust proxy", 1);
+
+// standard security headers. No CSP: this is a JSON API, and Clerk's scripts must keep working if the admin is served from here
+app.use(helmet({ contentSecurityPolicy: false, crossOriginResourcePolicy: { policy: "cross-origin" } }));
+
 // special handling: Stripe webhook needs raw body BEFORE any body parsing middleware
 // apply raw body parser conditionally only to webhook endpoint
 app.use("/api/payment/webhook", express.raw({ type: "application/json" }));
+// Clerk's webhook is verified from the raw body as well
+app.use("/api/webhooks/clerk", express.raw({ type: "application/json" }));
 
-app.use(express.json());
+app.use(express.json({ limit: "100kb" }));
 // CLIENT_URL may hold several comma-separated origins. Each one is cleaned (quotes, spaces, stray
 // non-ASCII characters and a trailing slash from copy-paste) because a bad character in this value
 // makes the cors package throw on every request.
@@ -45,10 +55,13 @@ app.use(
 
 // adds the auth object under req.auth; Stripe's webhook is verified by its signature instead
 const clerk = clerkMiddleware();
-const skipClerk = new Set(["/api/payment/webhook", "/api/health"]);
+const skipClerk = new Set(["/api/payment/webhook", "/api/webhooks/clerk", "/api/health"]);
 app.use((req, res, next) => (skipClerk.has(req.originalUrl) ? next() : clerk(req, res, next)));
 
-app.use("/api/inngest", serve({ client: inngest, functions }));
+app.use("/api", apiLimiter);
+
+// signed by Clerk (svix), so no login is needed: it keeps our user records in sync with Clerk
+app.post("/api/webhooks/clerk", handleClerkWebhook);
 
 app.use("/api/admin", adminRoutes);
 app.use("/api/users", userRoutes);
@@ -57,6 +70,7 @@ app.use("/api/reviews", reviewRoutes);
 app.use("/api/products", productRoutes);
 app.use("/api/cart", cartRoutes);
 app.use("/api/payment", paymentRoutes);
+app.use("/api/vendor", vendorRoutes);
 
 app.get("/api/health", (req, res) => {
   res.status(200).json({ message: "Success" });
@@ -82,6 +96,11 @@ const startServer = async () => {
   app.listen(ENV.PORT, () => {
     console.log("Server is up and running");
   });
+
+  // pays vendors whose holding period has ended, and retries payouts that failed or were interrupted
+  const sweep = () => settleAllDuePayouts().catch((error) => console.error("Payout sweep failed:", error.message));
+  setTimeout(sweep, 60 * 1000);
+  setInterval(sweep, 30 * 60 * 1000).unref();
 };
 
 startServer();

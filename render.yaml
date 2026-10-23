@@ -37,5 +37,20 @@ services:
         sync: false
       - key: STRIPE_WEBHOOK_SECRET
         sync: false
-      - key: INNGEST_SIGNING_KEY
+      # Clerk dashboard -> Webhooks -> your endpoint (https://<api>/api/webhooks/clerk) -> Signing secret
+      - key: CLERK_WEBHOOK_SIGNING_SECRET
         sync: false
+      # business rules (the defaults are shown; change them here without touching code)
+      - key: SUPPORT_REFUND_LIMIT
+        value: 100
+      - key: REFUND_APPROVAL_OVER
+        value: 500
+      - key: TRUSTED_AFTER_APPROVED
+        value: 3
+      - key: PLATFORM_FEE_PERCENT
+        value: 10
+      - key: PAYOUT_HOLD_HOURS
+        value: 72
+      # set to true once re-verification works with your Clerk instance (see README)
+      - key: REQUIRE_REVERIFICATION
+        value: false

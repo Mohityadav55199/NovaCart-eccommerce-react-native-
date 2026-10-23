@@ -6,6 +6,12 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productApi } from "../lib/api";
 import { getStockStatusBadge } from "../lib/utils";
 
+const REVIEW_BADGE = {
+  pending: { label: "Waiting for approval", badge: "badge-warning" },
+  rejected: { label: "Rejected", badge: "badge-error" },
+  paused: { label: "Paused (not on sale)", badge: "badge-ghost" },
+};
+
 function ProductsPage() {
   const [showModal, setShowModal] = useState(false);
   const [editingProduct, setEditingProduct] = useState(null);
@@ -20,7 +26,7 @@ function ProductsPage() {
   const [imagePreviews, setImagePreviews] = useState([]);
 
   const queryClient = useQueryClient();
-  const { role } = useRole();
+  const { role, can } = useRole();
 
   // fetch some data
   const {
@@ -54,6 +60,21 @@ function ProductsPage() {
     },
     onError: (error) => showError(error, "Failed to update the product"),
   });
+
+  const reviewMutation = useMutation({
+    mutationFn: productApi.review,
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["products"] });
+      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    },
+    onError: (error) => showError(error, "Failed to review the product"),
+  });
+
+  const handleReview = (product, decision) => {
+    const note = decision === "reject" ? window.prompt(`Why is "${product.name}" rejected? The vendor sees this.`, "") : "";
+    if (note === null) return;
+    reviewMutation.mutate({ id: product._id, decision, note });
+  };
 
   const deleteProductMutation = useMutation({
     mutationFn: productApi.delete,
@@ -155,6 +176,14 @@ function ProductsPage() {
         </div>
       )}
 
+      {role === "vendor" && products?.some((product) => product.status === "pending") && (
+        <div role="alert" className="alert alert-info text-sm">
+          <span>
+            New products are reviewed by the store before they go on sale. Products marked "Waiting for approval" are hidden until then.
+          </span>
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4">
         {products?.map((product) => {
           const status = getStockStatusBadge(product.stock);
@@ -188,6 +217,24 @@ function ProductsPage() {
                       </div>
                       <div className={`badge ${status.class} h-auto whitespace-nowrap shrink-0 py-1`}>{status.text}</div>
                     </div>
+                    {REVIEW_BADGE[product.status] && (
+                      <div className="mt-2">
+                        <span className={`badge ${REVIEW_BADGE[product.status].badge} h-auto py-1`}>{REVIEW_BADGE[product.status].label}</span>
+                        {product.status === "rejected" && product.reviewNote && (
+                          <p className="text-xs text-error mt-1">Reason: {product.reviewNote}</p>
+                        )}
+                        {product.status === "pending" && can("products:review") && (
+                          <div className="flex gap-2 mt-2">
+                            <button className="btn btn-xs btn-success" disabled={reviewMutation.isPending} onClick={() => handleReview(product, "approve")}>
+                              Approve
+                            </button>
+                            <button className="btn btn-xs btn-ghost" disabled={reviewMutation.isPending} onClick={() => handleReview(product, "reject")}>
+                              Reject
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    )}
                     <div className="flex items-center gap-6 mt-4 flex-wrap">
                       <div>
                         <p className="text-xs text-base-content/70">Price</p>

@@ -13,18 +13,33 @@
 - **REST API** (Node.js + Express + MongoDB) with role-based, admin-only routes
 - **Payments** with Stripe (payment sheet, free shipping over $100, 8% tax), including webhook-based order creation
 - **Image storage** on Cloudinary
-- **Background jobs** with Inngest (Clerk user sync); users are also created on first request as a fallback
+- **User sync** from Clerk through a signed webhook (new users, email changes, deletions); users are also created on first request as a fallback
+- **Vendors get paid** through Stripe Connect: each delivered item pays the vendor their share (platform fee configurable)
+- **Controls**: permission-based roles, an audit log, refund limits with second-admin approval, review of new vendors' products, and a pause switch per vendor
 - Optional error monitoring with Sentry
 
-## Roles
+## Roles and permissions
 
-| Role | Where | What they can do |
+Every route asks for a named **permission**, never for a role name. Roles are sets of permissions, and one person can hold several (a vendor who is also a customer, for example). `x:own` means "only their own data".
+
+| Role | Where | Can do |
 |---|---|---|
 | **Customer** | Mobile app | Browse, wishlist, cart, checkout, track orders, cancel an order until it ships (full refund), review delivered orders |
-| **Vendor** | Admin site | Manage **their own** products, see only the orders and items they sell, add a carrier and tracking number, mark items shipped or delivered |
-| **Admin** | Admin site | Everything: all products, orders and customers; cancel and refund any unshipped order; promote customers to vendors (Customers page) |
+| **Vendor** | Admin site | Their **own** products and orders only (`products:write:own`, `orders:fulfil:own`): add carrier and tracking, ship, deliver. Sees their payouts. First products need approval |
+| **Support** | Admin site | See all orders and customers (`orders:view`, `customers:view`) and refund up to the support limit. Cannot edit products or change roles |
+| **Admin** | Admin site | Everything, including approving products and large refunds, managing roles, pausing vendors and reading the audit log |
 
-Admins are the emails in `ADMIN_EMAIL` (comma-separated), so removing an email there ends that person's access immediately. Everyone else signs up as a customer; an admin makes someone a vendor from the **Customers** page.
+- **Admin** is not stored: it is the verified email(s) in `ADMIN_EMAIL`. Remove an email and that access ends at once. Everyone else signs up as a customer, and anyone can become a vendor from the admin site.
+- **Sign-in** offers *Customer* or *Vendor* (admins sign in through Vendor); this only picks the workspace. What a person may do is decided by the server from their account.
+- **Customer view**: the same account can open the customer home page, which offers "Become a vendor". The server also refuses staff powers to requests that come from the customer view.
+
+## Safety rules
+
+- **Refunds**: only unshipped orders can be cancelled, and the customer is refunded in full. Support can refund up to `SUPPORT_REFUND_LIMIT`; anything above waits for an admin. A refund above `REFUND_APPROVAL_OVER` needs a second admin (the only admin may approve their own).
+- **Audit log**: every refund, refund approval, role change, product review and vendor pause is recorded with who did it. Admins read it under *Audit log*.
+- **Vendor trust**: a vendor's first `TRUSTED_AFTER_APPROVED` products are hidden until an admin approves them. Admins can reject with a note, or pause a vendor (products come off sale; open orders can still be shipped). Removing the vendor role also stops them from re-adding it themselves.
+- **Payouts**: when an item is delivered, the vendor's share (price minus `PLATFORM_FEE_PERCENT`) is paid through Stripe Connect after `PAYOUT_HOLD_HOURS`. A vendor must ship before delivering, and a paid item can no longer be changed.
+- **Abuse protection**: rate limits per IP, security headers, and a size limit on request bodies.
 
 ## Order lifecycle
 
@@ -36,7 +51,7 @@ Admins are the emails in `ADMIN_EMAIL` (comma-separated), so removing an email t
 
 | Folder | What it is | Stack |
 |---|---|---|
-| [`backend/`](backend) | REST API | Express, Mongoose, Clerk, Stripe, Cloudinary, Inngest |
+| [`backend/`](backend) | REST API | Express, Mongoose, Clerk, Stripe (+ Connect), Cloudinary |
 | [`admin/`](admin) | Admin dashboard | React 19, Vite, TanStack Query, Tailwind + daisyUI |
 | [`mobile/`](mobile) | Customer app | Expo (SDK 54), Expo Router, NativeWind, Stripe React Native |
 
@@ -84,7 +99,13 @@ npm run seed:more --prefix backend
 | `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, `CLOUDINARY_API_SECRET` | Cloudinary, API Keys (use a key with the Master Admin role) |
 | `STRIPE_PUBLISHABLE_KEY`, `STRIPE_SECRET_KEY` | Stripe test-mode keys |
 | `STRIPE_WEBHOOK_SECRET` | Local: `stripe listen --forward-to localhost:3000/api/payment/webhook`. Production: Stripe, Developers, Webhooks |
-| `INNGEST_SIGNING_KEY` | Optional |
+| `CLERK_WEBHOOK_SIGNING_SECRET` | Signing secret of the Clerk webhook endpoint (see Deployment) |
+| `SUPPORT_REFUND_LIMIT` | Support can refund up to this much on their own (default `100`) |
+| `REFUND_APPROVAL_OVER` | Refunds above this need a second admin (default `500`) |
+| `TRUSTED_AFTER_APPROVED` | A vendor's first N products need approval (default `3`) |
+| `PLATFORM_FEE_PERCENT` | Share the store keeps of each delivered item (default `10`) |
+| `PAYOUT_HOLD_HOURS` | Wait this long after delivery before paying the vendor (default `72`) |
+| `REQUIRE_REVERIFICATION` | `true` asks Clerk to re-confirm identity before refunds and role changes (default `false`) |
 
 ### `admin/.env`
 
@@ -108,6 +129,13 @@ The same Clerk publishable key is used in all three apps; the Clerk secret key b
 ## Deployment
 
 The API runs on **Render** and the admin dashboard on **Vercel**.
+
+### 0. One-time setup in Clerk and Stripe
+
+1. **Clerk webhook** (keeps users in sync): Clerk dashboard, **Configure, Webhooks, Add endpoint**. URL `https://<your-api>.onrender.com/api/webhooks/clerk`, events `user.created`, `user.updated`, `user.deleted`. Copy the **Signing secret** into `CLERK_WEBHOOK_SIGNING_SECRET` on Render.
+2. **Stripe Connect** (vendor payouts): Stripe dashboard, **Connect, Get started** (test mode is fine). Until it is on, vendors see "payouts are not switched on yet" and their earnings wait; nothing else is affected.
+3. **Two-factor sign-in** for admins and vendors: Clerk dashboard, **User & authentication, Multi-factor**.
+4. **Re-verification** (optional): after trying a refund with `REQUIRE_REVERIFICATION=true` on a test account, leave it on if Clerk shows its confirm dialog.
 
 ### 1. API on Render
 

@@ -11,6 +11,7 @@ import {
   updateAddress,
 } from "../controllers/user.controller.js";
 import { protectRoute } from "../middleware/auth.middleware.js";
+import { becomeVendorLimiter } from "../middleware/security.middleware.js";
 
 const router = Router();
 
@@ -18,7 +19,7 @@ router.use(protectRoute);
 
 // who am I (roles) and start selling
 router.get("/me", getMe);
-router.post("/become-vendor", becomeVendor);
+router.post("/become-vendor", becomeVendorLimiter, becomeVendor);
 
 // address routes
 router.post("/addresses", addAddress);

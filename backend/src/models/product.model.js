@@ -31,6 +31,14 @@ const productSchema = new mongoose.Schema(
         required: true,
       },
     ],
+    // pending: waiting for an admin; approved: on sale; rejected: not allowed; paused: its vendor was paused.
+    // Only "approved" products are shown in the shop and can be bought.
+    status: {
+      type: String,
+      enum: ["pending", "approved", "rejected", "paused"],
+      default: "approved",
+    },
+    reviewNote: { type: String, default: "" },
     // the vendor who sells it; empty for store-owned products
     vendor: {
       type: mongoose.Schema.Types.ObjectId,
@@ -51,5 +59,6 @@ const productSchema = new mongoose.Schema(
 );
 
 productSchema.index({ vendor: 1 });
+productSchema.index({ status: 1 });
 
 export const Product = mongoose.model("Product", productSchema);

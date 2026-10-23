@@ -1,3 +1,4 @@
+import { Link } from "react-router";
 import { useQuery } from "@tanstack/react-query";
 import { describeError, ERROR_HINT } from "../lib/errors";
 import { orderApi, statsApi } from "../lib/api";
@@ -50,8 +51,35 @@ function DashboardPage() {
     },
   ];
 
+  const reviewScope = role === "vendor" ? "own" : "all";
+  const attention = [
+    statsData?.pendingProducts > 0 && {
+      key: "products",
+      to: "/products",
+      text:
+        reviewScope === "own"
+          ? `${statsData.pendingProducts} of your products ${statsData.pendingProducts === 1 ? "is" : "are"} waiting for approval`
+          : `${statsData.pendingProducts} ${statsData.pendingProducts === 1 ? "product is" : "products are"} waiting for your review`,
+    },
+    statsData?.pendingRefunds > 0 && {
+      key: "refunds",
+      to: "/orders",
+      text: `${statsData.pendingRefunds} ${statsData.pendingRefunds === 1 ? "refund is" : "refunds are"} waiting for your approval`,
+    },
+  ].filter(Boolean);
+
   return (
     <div className="space-y-6">
+      {attention.length > 0 && (
+        <div className="flex flex-wrap gap-3">
+          {attention.map((item) => (
+            <Link key={item.key} to={item.to} className="alert alert-warning w-auto text-sm">
+              <span>{item.text}</span>
+            </Link>
+          ))}
+        </div>
+      )}
+
       {(statsError || ordersError) && (
         <div role="alert" className="alert alert-error">
           <span>

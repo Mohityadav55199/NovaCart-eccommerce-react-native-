@@ -1,6 +1,10 @@
 import { Order } from "../models/order.model.js";
 import { Product } from "../models/product.model.js";
 import { stripe } from "../config/stripe.js";
+import { REFUND_APPROVAL_OVER, SUPPORT_REFUND_LIMIT } from "../config/limits.js";
+import { User } from "../models/user.model.js";
+import { adminEmailList } from "../middleware/auth.middleware.js";
+import { payoutDeliveredItems } from "./payout.service.js";
 
 // an error the controllers can turn straight into an HTTP response
 export class OrderError extends Error {
@@ -72,6 +76,11 @@ export async function cancelOrder(orderId, { reason = "", by }) {
     refundId: refund?.id,
     refundAmount: refund ? refund.amount / 100 : 0,
   };
+  if (order.refundRequest?.status === "pending") {
+    order.refundRequest.status = "rejected";
+    order.refundRequest.decidedBy = "system (order was cancelled)";
+    order.refundRequest.decidedAt = new Date();
+  }
   order.recomputeStatus();
   order.statusHistory.push({
     status: "cancelled",
@@ -118,7 +127,8 @@ async function applyDerivedStatus(orderId, events) {
   return Order.findById(orderId);
 }
 
-const NEXT_STATUS = { pending: ["shipped", "delivered"], shipped: ["delivered"], delivered: [] };
+// a vendor moves an item one step at a time: shipped first, then delivered (admins may set any status)
+const NEXT_STATUS = { pending: ["shipped"], shipped: ["delivered"], delivered: [] };
 
 /**
  * Updates one order item's fulfilment (status, carrier, tracking number).
@@ -132,15 +142,25 @@ export async function updateItemFulfilment(order, itemId, { status, carrier, tra
   const item = order.orderItems.id(itemId);
   if (!item) throw new OrderError(404, "Order item not found");
 
+  // scope "all": may fulfil anyone's items (admin); "own": only the items they sell
   const isOwner = item.vendor && item.vendor.toString() === actor.user._id.toString();
-  if (actor.role !== "admin" && !isOwner) throw new OrderError(403, "This item is not yours to fulfil");
+  if (actor.scope !== "all" && !(actor.scope === "own" && isOwner)) {
+    throw new OrderError(403, "This item is not yours to fulfil");
+  }
   if (item.status === "cancelled") throw new OrderError(400, "This item was cancelled");
+
+  if (actor.scope !== "all" && status === "shipped" && order.refundRequest?.status === "pending") {
+    throw new OrderError(409, "A refund is being reviewed for this order, so it cannot be shipped right now");
+  }
 
   const set = {};
   let newStatus = item.status;
 
   if (status && status !== item.status) {
-    const allowed = actor.role === "admin" ? ["pending", "shipped", "delivered"] : NEXT_STATUS[item.status] || [];
+    if (["paid", "processing"].includes(item.payout?.status)) {
+      throw new OrderError(400, "This item has already been paid out to its vendor, so its status can no longer change");
+    }
+    const allowed = actor.scope === "all" ? ["pending", "shipped", "delivered"] : NEXT_STATUS[item.status] || [];
     if (!allowed.includes(status)) {
       throw new OrderError(400, `Cannot change an item from ${item.status} to ${status}`);
     }
@@ -168,14 +188,18 @@ export async function updateItemFulfilment(order, itemId, { status, carrier, tra
   );
   if (result.matchedCount === 0) throw new OrderError(409, CONFLICT);
 
-  return applyDerivedStatus(order._id, [
+  const updated = await applyDerivedStatus(order._id, [
     {
       status: newStatus,
       note: `${item.name}: ${newStatus}${newTracking ? ` (tracking ${newTracking})` : ""}`,
-      by: actor.role === "admin" ? "admin" : actor.user.name,
+      by: actor.scope === "all" ? actor.role : actor.user.name,
       item: item._id,
     },
   ]);
+
+  // paid after the holding period (or at once if it is 0); never makes the vendor wait for Stripe
+  if (newStatus === "delivered") payoutDeliveredItems(order._id).catch((error) => console.error("Payout after delivery:", error.message));
+  return updated;
 }
 
 // admin shortcut: move every active item of an order to the same status in one step
@@ -191,9 +215,118 @@ export async function setAllItemsStatus(orderId, status, by) {
         "orderItems.$[i].deliveredAt": status === "delivered" ? now : null,
       },
     },
-    { arrayFilters: [{ "i.status": { $ne: "cancelled" } }] }
+    // only items that would actually change: not cancelled, not already that status, not already paid out
+    // timestamps off: Mongoose would otherwise touch updatedAt and make an empty change look like a change
+    {
+      timestamps: false,
+      arrayFilters: [{ "i.status": { $nin: ["cancelled", status] }, "i.payout.status": { $nin: ["paid", "processing"] } }],
+    }
   );
   if (result.matchedCount === 0) throw new OrderError(409, CONFLICT);
 
-  return applyDerivedStatus(orderId, [{ status, note: `All items marked ${status}`, by }]);
+  // nothing changed (already that status, or everything already paid out): do not write a history entry for it
+  if (result.modifiedCount === 0) return { order: await Order.findById(orderId), changed: false };
+
+  const updated = await applyDerivedStatus(orderId, [{ status, note: `All items marked ${status}`, by }]);
+
+  if (status === "delivered") payoutDeliveredItems(orderId).catch((error) => console.error("Payout after delivery:", error.message));
+  return { order: updated, changed: true };
+}
+
+/* ------------------------------------------------------------------ staff refunds with limits and approval */
+
+// true when there is no second admin who could approve (counts real, verified admin accounts, not config entries)
+const singleAdmin = async () =>
+  (await User.countDocuments({ email: { $in: adminEmailList() }, emailVerified: { $ne: false } })) < 2;
+
+// the most a person may refund without someone else's approval
+export const refundLimitFor = (role) => (role === "admin" ? REFUND_APPROVAL_OVER : SUPPORT_REFUND_LIMIT);
+
+/**
+ * Staff cancel an unshipped order and refund it. Within the person's limit it happens at once; above it, the
+ * request waits for an admin who is not the one asking (the only admin may approve their own, since nobody else can).
+ * Returns { done: true, order } or { done: false, order } when the refund is waiting for approval.
+ */
+export async function cancelAsStaff(orderId, { reason = "", actor }) {
+  const order = await Order.findById(orderId);
+  if (!order) throw new OrderError(404, "Order not found");
+
+  if (order.status === "pending" && order.totalPrice > refundLimitFor(actor.role)) {
+    if (order.refundRequest?.status === "pending") {
+      throw new OrderError(409, "A refund for this order is already waiting for approval");
+    }
+
+    const result = await Order.updateOne(
+      { _id: orderId, status: "pending", "refundRequest.status": { $ne: "pending" } },
+      {
+        $set: {
+          refundRequest: {
+            status: "pending",
+            by: actor.user._id,
+            byName: actor.user.name,
+            reason: reason || "",
+            at: new Date(),
+          },
+        },
+      }
+    );
+    if (result.matchedCount === 0) throw new OrderError(409, CONFLICT);
+
+    return { done: false, order: await Order.findById(orderId) };
+  }
+
+  return { done: true, order: await cancelOrder(orderId, { reason, by: actor.role }) };
+}
+
+/**
+ * An admin approves or rejects a refund that was over the requester's limit.
+ * The approver cannot be the person who asked, unless there is only one admin.
+ */
+export async function decideRefundRequest(orderId, decision, { actor, note = "" }) {
+  const order = await Order.findById(orderId);
+  const request = order?.refundRequest;
+  if (!order) throw new OrderError(404, "Order not found");
+  if (request?.status !== "pending") throw new OrderError(400, "There is no refund waiting for approval on this order");
+
+  const sameAsRequester = request.by?.toString() === actor.user._id.toString();
+  if (decision === "approve" && sameAsRequester && !(await singleAdmin())) {
+    throw new OrderError(403, "A different admin has to approve this refund");
+  }
+
+  // claim the decision first, so two approvals cannot both refund
+  const claimed = await Order.findOneAndUpdate(
+    { _id: orderId, "refundRequest.status": "pending" },
+    {
+      $set: {
+        "refundRequest.status": decision === "approve" ? "approved" : "rejected",
+        "refundRequest.decidedBy": actor.user.name,
+        "refundRequest.decidedAt": new Date(),
+      },
+    }
+  );
+  if (!claimed) throw new OrderError(409, CONFLICT);
+
+  if (decision === "reject") {
+    await Order.updateOne(
+      { _id: orderId },
+      { $push: { statusHistory: { status: order.status, note: `Refund request rejected${note ? `: ${note}` : ""}`, by: actor.user.name } } }
+    );
+    return Order.findById(orderId);
+  }
+
+  try {
+    return await cancelOrder(orderId, { reason: request.reason || "", by: `${actor.role} (approved)` });
+  } catch (error) {
+    if (error.status === 502) {
+      // Stripe could not refund right now: put the request back so it can be approved again
+      await Order.updateOne({ _id: orderId }, { $set: { "refundRequest.status": "pending" }, $unset: { "refundRequest.decidedBy": "", "refundRequest.decidedAt": "" } });
+    } else {
+      // the order shipped or was cancelled meanwhile: the request can never be carried out, so close it
+      await Order.updateOne(
+        { _id: orderId },
+        { $set: { "refundRequest.status": "rejected", "refundRequest.decidedBy": "system (order can no longer be refunded)" } }
+      );
+    }
+    throw error;
+  }
 }

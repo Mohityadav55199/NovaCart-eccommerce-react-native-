@@ -20,6 +20,12 @@ export const productApi = {
     const { data } = await axiosInstance.delete(`/admin/products/${productId}`);
     return data;
   },
+
+  // approve or reject a vendor's product (needs the review permission)
+  review: async ({ id, decision, note }) => {
+    const { data } = await axiosInstance.post(`/admin/products/${id}/review`, { decision, note });
+    return data;
+  },
 };
 
 export const orderApi = {
@@ -39,9 +45,15 @@ export const orderApi = {
     return data;
   },
 
-  // admin: cancel an unshipped order and refund the customer
+  // cancel an unshipped order and refund the customer (over the person's limit it becomes a request)
   cancel: async ({ orderId, reason }) => {
     const { data } = await axiosInstance.post(`/admin/orders/${orderId}/cancel`, { reason });
+    return data;
+  },
+
+  // an admin approves or rejects a refund that was over someone's limit
+  decideRefund: async ({ orderId, decision, note }) => {
+    const { data } = await axiosInstance.post(`/admin/orders/${orderId}/refund-request/${decision}`, { note });
     return data;
   },
 };
@@ -72,13 +84,37 @@ export const statsApi = {
 };
 
 export const customerApi = {
-  setRole: async ({ id, role }) => {
-    const { data } = await axiosInstance.patch(`/admin/customers/${id}/role`, { role });
+  // turn the vendor and/or support role on or off: { id, vendor?: boolean, support?: boolean }
+  setRoles: async ({ id, ...roles }) => {
+    const { data } = await axiosInstance.patch(`/admin/customers/${id}/roles`, roles);
+    return data;
+  },
+
+  pause: async ({ id, paused }) => {
+    const { data } = await axiosInstance.patch(`/admin/customers/${id}/pause`, { paused });
     return data;
   },
 
   getAll: async () => {
     const { data } = await axiosInstance.get("/admin/customers");
+    return data;
+  },
+};
+
+export const vendorApi = {
+  payouts: async () => {
+    const { data } = await axiosInstance.get("/vendor/payouts");
+    return data;
+  },
+  connect: async () => {
+    const { data } = await axiosInstance.post("/vendor/connect");
+    return data;
+  },
+};
+
+export const auditApi = {
+  getAll: async (params) => {
+    const { data } = await axiosInstance.get("/admin/audit", { params });
     return data;
   },
 };

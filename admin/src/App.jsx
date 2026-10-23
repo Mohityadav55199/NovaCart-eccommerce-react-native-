@@ -8,16 +8,18 @@ const DashboardPage = lazy(() => import("./pages/DashboardPage"));
 const ProductsPage = lazy(() => import("./pages/ProductsPage"));
 const OrdersPage = lazy(() => import("./pages/OrdersPage"));
 const CustomersPage = lazy(() => import("./pages/CustomersPage"));
+const PayoutsPage = lazy(() => import("./pages/PayoutsPage"));
+const AuditPage = lazy(() => import("./pages/AuditPage"));
 import DashboardLayout from "./layouts/DashboardLayout";
 
 import PageLoader from "./components/PageLoader";
 import AdminGate from "./components/AdminGate";
 import { useRole } from "./lib/role";
 
-// customers (and role management) are for admins only
-function CustomersRoute() {
-  const { role } = useRole();
-  return role === "admin" ? <CustomersPage /> : <Navigate to="/dashboard" replace />;
+// a page that needs a permission: anyone without it is sent back to the dashboard
+function Guarded({ perm, children }) {
+  const { can } = useRole();
+  return can(perm) ? children : <Navigate to="/dashboard" replace />;
 }
 
 function App() {
@@ -48,7 +50,9 @@ function App() {
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="products" element={<ProductsPage />} />
         <Route path="orders" element={<OrdersPage />} />
-        <Route path="customers" element={<CustomersRoute />} />
+        <Route path="payouts" element={<Guarded perm="payouts:view"><PayoutsPage /></Guarded>} />
+        <Route path="customers" element={<Guarded perm="customers:view"><CustomersPage /></Guarded>} />
+        <Route path="audit" element={<Guarded perm="audit:view"><AuditPage /></Guarded>} />
       </Route>
     </Routes>
     </Suspense>

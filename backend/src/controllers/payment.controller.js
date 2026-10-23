@@ -5,6 +5,7 @@ import { Order } from "../models/order.model.js";
 import { stripe } from "../config/stripe.js";
 import { computePricing } from "../config/pricing.js";
 import { MAX_METADATA_KEYS, packMeta, unpackMeta } from "../utils/stripeMeta.js";
+import { ON_SALE } from "./product.controller.js";
 
 const ADDRESS_FIELDS = ["fullName", "streetAddress", "city", "state", "zipCode", "phoneNumber"];
 
@@ -38,7 +39,7 @@ export async function createPaymentIntent(req, res) {
     const validatedItems = [];
 
     for (const [id, quantity] of quantities) {
-      const product = await Product.findById(id);
+      const product = await Product.findOne({ _id: id, ...ON_SALE });
       if (!product) {
         return res.status(404).json({ error: "A product in your cart is no longer available" });
       }

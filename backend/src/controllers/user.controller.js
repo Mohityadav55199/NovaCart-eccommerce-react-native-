@@ -1,7 +1,7 @@
 import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { Product } from "../models/product.model.js";
-import { getRole, getRoles } from "../middleware/auth.middleware.js";
+import { getPermissions, getRole, getRoles } from "../middleware/auth.middleware.js";
 
 export async function addAddress(req, res) {
   try {
@@ -170,6 +170,8 @@ const describeMe = (user) => ({
   role: getRole(user), // highest: "admin" | "vendor" | "customer"
   roles: getRoles(user),
   storeName: user.vendorProfile?.storeName || "",
+  paused: !!user.vendorProfile?.paused,
+  permissions: [...getPermissions(user)],
 });
 
 // the web portal asks this after sign-in to decide what to show
@@ -190,7 +192,10 @@ export async function becomeVendor(req, res) {
       return res.status(403).json({ error: "Selling is disabled for this account. Contact the store owner." });
     }
     if (!user.roles.includes("vendor")) user.roles.push("vendor");
-    user.vendorProfile = { storeName, since: user.vendorProfile?.since || new Date(), suspended: false };
+    // set field by field: a pause or a connected payout account must survive this
+    user.set("vendorProfile.storeName", storeName);
+    user.set("vendorProfile.since", user.vendorProfile?.since || new Date());
+    user.set("vendorProfile.suspended", false);
     await user.save();
 
     res.status(200).json({ message: "You are now a vendor", user: describeMe(user) });

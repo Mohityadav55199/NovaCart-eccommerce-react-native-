@@ -42,6 +42,17 @@ const orderItemSchema = new mongoose.Schema({
   trackingNumber: { type: String, default: "" },
   shippedAt: Date,
   deliveredAt: Date,
+  // the vendor's share, paid out once the item is delivered (see payout.service.js)
+  payout: {
+    status: { type: String, enum: ["none", "waiting_for_account", "processing", "paid", "failed"], default: "none" },
+    amount: Number, // what the vendor receives
+    fee: Number, // what the platform keeps
+    transferId: String,
+    at: Date,
+    error: String,
+    claimedAt: Date, // when a payout attempt started (an interrupted one is recovered after a few minutes)
+    attemptId: String,
+  },
 });
 
 const shippingAddressSchema = new mongoose.Schema({
@@ -125,6 +136,16 @@ const orderSchema = new mongoose.Schema(
       at: Date,
       refundId: String,
       refundAmount: Number,
+    },
+    // a refund above the person's limit waits here until an admin (not the one who asked) approves it
+    refundRequest: {
+      status: { type: String, enum: ["pending", "approved", "rejected"] },
+      by: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+      byName: String,
+      reason: String,
+      at: Date,
+      decidedBy: String,
+      decidedAt: Date,
     },
     deliveredAt: {
       type: Date,

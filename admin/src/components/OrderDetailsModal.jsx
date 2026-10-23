@@ -4,30 +4,34 @@ import { XIcon } from "lucide-react";
 import { orderApi } from "../lib/api";
 import { describeError } from "../lib/errors";
 import { useRole } from "../lib/role";
+import { useSensitive, wasCancelled } from "../lib/reverify";
 import { capitalizeText, formatDate, getOrderStatusBadge } from "../lib/utils";
 
 const FLOW = ["pending", "shipped", "delivered"];
 
-// statuses an item can be moved to: admins may set any, vendors only move forward
-const statusOptions = (current, role) =>
-  role === "admin" ? FLOW : FLOW.filter((status) => FLOW.indexOf(status) >= FLOW.indexOf(current));
+// statuses an item can be moved to: someone who may fulfil everything can set any, a vendor only moves forward
+const statusOptions = (current, canSetAny) =>
+  canSetAny ? FLOW : FLOW.filter((status) => FLOW.indexOf(status) >= FLOW.indexOf(current));
 
 const formatDateTime = (value) =>
   value ? new Date(value).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "";
 
 function ItemRow({ order, item, canEdit }) {
-  const { role } = useRole();
+  const { scopeOf } = useRole();
   const queryClient = useQueryClient();
 
   const [status, setStatus] = useState(item.status);
   const [carrier, setCarrier] = useState(item.carrier || "");
   const [trackingNumber, setTrackingNumber] = useState(item.trackingNumber || "");
 
+  const paidOut = ["paid", "processing"].includes(item.payout?.status);
+
   const mutation = useMutation({
     mutationFn: orderApi.updateItem,
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["orders"] });
       queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+      queryClient.invalidateQueries({ queryKey: ["payouts"] });
     },
     onError: (error) => alert(describeError(error)),
   });
@@ -56,7 +60,7 @@ function ItemRow({ order, item, canEdit }) {
         </div>
       </div>
 
-      {canEdit && item.status !== "cancelled" && (
+      {canEdit && item.status !== "cancelled" && !paidOut && (
         <div className="mt-3 grid grid-cols-1 sm:grid-cols-4 gap-2">
           <select
             className="select select-sm"
@@ -64,7 +68,7 @@ function ItemRow({ order, item, canEdit }) {
             onChange={(e) => setStatus(e.target.value)}
             disabled={mutation.isPending}
           >
-            {statusOptions(item.status, role).map((option) => (
+            {statusOptions(item.status, scopeOf("orders:fulfil") === "all").map((option) => (
               <option key={option} value={option}>
                 {capitalizeText(option)}
               </option>
@@ -96,6 +100,12 @@ function ItemRow({ order, item, canEdit }) {
         </div>
       )}
 
+      {paidOut && (
+        <p className="mt-2 text-xs opacity-70">
+          Delivered and paid out to the vendor{item.payout?.amount ? ` ($${item.payout.amount.toFixed(2)})` : ""}, so it can no longer be changed.
+        </p>
+      )}
+
       {!canEdit && item.trackingNumber && (
         <p className="mt-2 text-sm opacity-70">
           {item.carrier ? `${item.carrier}: ` : "Tracking: "}
@@ -107,25 +117,37 @@ function ItemRow({ order, item, canEdit }) {
 }
 
 function OrderDetailsModal({ order, onClose }) {
-  const { role } = useRole();
+  const { can, scopeOf } = useRole();
   const queryClient = useQueryClient();
 
+  const refresh = () => {
+    queryClient.invalidateQueries({ queryKey: ["orders"] });
+    queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
+    queryClient.invalidateQueries({ queryKey: ["products"] });
+    queryClient.invalidateQueries({ queryKey: ["audit"] });
+  };
+  const fail = (error) => {
+    if (!wasCancelled(error)) alert(describeError(error));
+  };
+
+  // refunds ask Clerk to re-confirm the person's identity when the server requires it
+  const cancelCall = useSensitive(orderApi.cancel);
   const cancelMutation = useMutation({
-    mutationFn: orderApi.cancel,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
-      queryClient.invalidateQueries({ queryKey: ["products"] });
+    mutationFn: cancelCall,
+    onSuccess: (result) => {
+      refresh();
+      // over the person's limit: it is now a request, not a refund
+      if (result?.pending) alert(result.message);
     },
-    onError: (error) => alert(describeError(error)),
+    onError: fail,
   });
+
+  const decideCall = useSensitive(orderApi.decideRefund);
+  const decideMutation = useMutation({ mutationFn: decideCall, onSuccess: refresh, onError: fail });
 
   const bulkMutation = useMutation({
     mutationFn: orderApi.updateStatus,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["orders"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboardStats"] });
-    },
+    onSuccess: refresh,
     onError: (error) => alert(describeError(error)),
   });
 
@@ -138,7 +160,19 @@ function OrderDetailsModal({ order, onClose }) {
     cancelMutation.mutate({ orderId: order._id, reason });
   };
 
-  const canEdit = order.status !== "cancelled";
+  const handleDecision = (decision) => {
+    const note =
+      decision === "reject" ? window.prompt("Why is this refund rejected? (optional)", "") : "";
+    if (note === null) return;
+    if (decision === "approve" && !window.confirm(`Approve the refund of $${order.totalPrice.toFixed(2)}? The customer is refunded immediately.`)) return;
+    decideMutation.mutate({ orderId: order._id, decision, note });
+  };
+
+  const sellerView = scopeOf("orders:view") === "own";
+  const canFulfil = order.status !== "cancelled" && can("orders:fulfil");
+  const canRefund = order.status === "pending" && can("orders:refund");
+  const canApprove = can("orders:refund:approve");
+  const request = order.refundRequest;
   const pricing = order.pricing;
 
   return (
@@ -162,7 +196,7 @@ function OrderDetailsModal({ order, onClose }) {
             {order.shippingAddress.zipCode}
           </p>
           <p className="opacity-80">{order.shippingAddress.phoneNumber}</p>
-          {role === "admin" && order.user?.email && <p className="opacity-60">{order.user.email}</p>}
+          {order.user?.email && <p className="opacity-60">{order.user.email}</p>}
         </div>
 
         {/* CANCELLATION */}
@@ -177,25 +211,55 @@ function OrderDetailsModal({ order, onClose }) {
           </div>
         )}
 
+        {/* REFUND WAITING FOR APPROVAL */}
+        {order.status === "pending" && request?.status === "pending" && (
+          <div role="alert" className="alert alert-warning mt-4 text-sm items-start">
+            <div className="w-full">
+              <p className="font-semibold">Refund of ${order.totalPrice.toFixed(2)} is waiting for approval</p>
+              <p>
+                Requested by {request.byName} on {formatDate(request.at)}
+                {request.reason ? `: "${request.reason}"` : ""}.
+              </p>
+              {canApprove ? (
+                <div className="flex gap-2 mt-2">
+                  <button className="btn btn-sm btn-success" disabled={decideMutation.isPending} onClick={() => handleDecision("approve")}>
+                    Approve refund
+                  </button>
+                  <button className="btn btn-sm btn-ghost" disabled={decideMutation.isPending} onClick={() => handleDecision("reject")}>
+                    Reject
+                  </button>
+                </div>
+              ) : (
+                <p className="opacity-70 mt-1">An admin has to approve it.</p>
+              )}
+            </div>
+          </div>
+        )}
+        {order.status === "pending" && request?.status === "rejected" && (
+          <p className="mt-3 text-xs opacity-60">
+            A refund request was rejected by {request.decidedBy} on {formatDate(request.decidedAt)}.
+          </p>
+        )}
+
         {/* ITEMS */}
         <div className="mt-4 space-y-2">
           <h4 className="font-semibold">Items</h4>
           {order.orderItems.map((item) => (
             <ItemRow
-              key={`${item._id}-${item.status}-${item.carrier}-${item.trackingNumber}`}
+              key={`${item._id}-${item.status}-${item.carrier}-${item.trackingNumber}-${item.payout?.status}`}
               order={order}
               item={item}
-              canEdit={canEdit}
+              canEdit={canFulfil}
             />
           ))}
-          {role === "vendor" && (
+          {sellerView && (
             <p className="text-xs opacity-60">You only see the items you sell. Other items in this order belong to other sellers.</p>
           )}
         </div>
 
         {/* TOTALS */}
         <div className="mt-4 text-sm space-y-1">
-          {role === "admin" && pricing?.subtotal !== undefined ? (
+          {!sellerView && pricing?.subtotal !== undefined ? (
             <>
               <div className="flex justify-between"><span className="opacity-70">Subtotal</span><span>${pricing.subtotal.toFixed(2)}</span></div>
               <div className="flex justify-between">
@@ -206,8 +270,8 @@ function OrderDetailsModal({ order, onClose }) {
             </>
           ) : null}
           <div className="flex justify-between font-bold text-base">
-            <span>{role === "vendor" ? "Your items" : "Total"}</span>
-            <span>${(role === "vendor" ? order.myTotal : order.totalPrice).toFixed(2)}</span>
+            <span>{sellerView ? "Your items" : "Total"}</span>
+            <span>${(sellerView ? order.myTotal : order.totalPrice).toFixed(2)}</span>
           </div>
         </div>
 
@@ -230,33 +294,37 @@ function OrderDetailsModal({ order, onClose }) {
           </div>
         )}
 
-        {/* ADMIN ACTIONS */}
-        {role === "admin" && canEdit && (
+        {/* ACTIONS */}
+        {order.status !== "cancelled" && (scopeOf("orders:fulfil") === "all" || canRefund) && (
           <div className="modal-action justify-between flex-wrap gap-2">
-            <label className="flex items-center gap-2 text-sm">
-              Set all items to
-              <select
-                className="select select-sm"
-                value=""
-                disabled={bulkMutation.isPending}
-                onChange={(e) => e.target.value && bulkMutation.mutate({ orderId: order._id, status: e.target.value })}
-              >
-                <option value="">choose…</option>
-                {FLOW.map((status) => (
-                  <option key={status} value={status}>
-                    {capitalizeText(status)}
-                  </option>
-                ))}
-              </select>
-            </label>
+            {scopeOf("orders:fulfil") === "all" ? (
+              <label className="flex items-center gap-2 text-sm">
+                Set all items to
+                <select
+                  className="select select-sm"
+                  value=""
+                  disabled={bulkMutation.isPending}
+                  onChange={(e) => e.target.value && bulkMutation.mutate({ orderId: order._id, status: e.target.value })}
+                >
+                  <option value="">choose…</option>
+                  {FLOW.map((status) => (
+                    <option key={status} value={status}>
+                      {capitalizeText(status)}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ) : (
+              <span />
+            )}
 
-            {order.status === "pending" ? (
+            {canRefund && request?.status !== "pending" ? (
               <button className="btn btn-error btn-sm" onClick={handleCancel} disabled={cancelMutation.isPending}>
                 {cancelMutation.isPending ? <span className="loading loading-spinner loading-xs" /> : "Cancel & refund"}
               </button>
-            ) : (
+            ) : can("orders:refund") && order.status !== "pending" ? (
               <span className="text-xs opacity-60">Shipped orders can no longer be cancelled</span>
-            )}
+            ) : null}
           </div>
         )}
       </div>

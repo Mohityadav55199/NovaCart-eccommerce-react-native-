@@ -6,16 +6,21 @@ import {
   ClipboardListIcon,
   HomeIcon,
   PanelLeftIcon,
+  ScrollTextIcon,
   ShoppingBagIcon,
   UsersIcon,
+  WalletIcon,
 } from "lucide-react";
 
 // eslint-disable-next-line
 export const NAVIGATION = [
-  { name: "Dashboard", path: "/dashboard", icon: <HomeIcon className="size-5" />, roles: ["admin", "vendor"] },
-  { name: "Products", path: "/products", icon: <ShoppingBagIcon className="size-5" />, roles: ["admin", "vendor"] },
-  { name: "Orders", path: "/orders", icon: <ClipboardListIcon className="size-5" />, roles: ["admin", "vendor"] },
-  { name: "Customers", path: "/customers", icon: <UsersIcon className="size-5" />, roles: ["admin"] },
+  // `perm`: shown to anyone who has it (whole or ":own"); the server checks it again on every request
+  { name: "Dashboard", path: "/dashboard", icon: <HomeIcon className="size-5" />, perm: "dashboard:view" },
+  { name: "Products", path: "/products", icon: <ShoppingBagIcon className="size-5" />, perm: "products:read" },
+  { name: "Orders", path: "/orders", icon: <ClipboardListIcon className="size-5" />, perm: "orders:view" },
+  { name: "Payouts", path: "/payouts", icon: <WalletIcon className="size-5" />, perm: "payouts:view" },
+  { name: "Customers", path: "/customers", icon: <UsersIcon className="size-5" />, perm: "customers:view" },
+  { name: "Audit log", path: "/audit", icon: <ScrollTextIcon className="size-5" />, perm: "audit:view" },
 ];
 
 function Navbar() {
