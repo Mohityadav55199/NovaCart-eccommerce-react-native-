@@ -1,15 +1,11 @@
-import Stripe from "stripe";
 import { ENV } from "../config/env.js";
 import { User } from "../models/user.model.js";
 import { Product } from "../models/product.model.js";
 import { Order } from "../models/order.model.js";
 import { Cart } from "../models/cart.model.js";
+import { stripe } from "../config/stripe.js";
+import { computePricing } from "../config/pricing.js";
 
-const stripe = new Stripe(ENV.STRIPE_SECRET_KEY);
-
-const SHIPPING_FEE = 10;
-const FREE_SHIPPING_OVER = 100; // orders with a subtotal at or above this ship free
-const TAX_RATE = 0.08;
 
 export async function createPaymentIntent(req, res) {
   try {
@@ -58,10 +54,7 @@ export async function createPaymentIntent(req, res) {
       return res.status(400).json({ error: "Too many items or address too long for one order" });
     }
 
-    // keep in sync with mobile/app/(tabs)/cart.tsx
-    const shipping = subtotal >= FREE_SHIPPING_OVER ? 0 : SHIPPING_FEE;
-    const tax = subtotal * TAX_RATE;
-    const total = subtotal + shipping + tax;
+    const { shipping, tax, total } = computePricing(subtotal);
 
     if (total <= 0) {
       return res.status(400).json({ error: "Invalid order total" });
@@ -146,6 +139,8 @@ export async function handleWebhook(req, res) {
       const products = await Product.find({ _id: { $in: items.map((item) => item.p) } });
       const productById = new Map(products.map((product) => [product._id.toString(), product]));
 
+      const orderSubtotal = items.reduce((sum, item) => sum + item.pr * item.q, 0);
+
       const order = await Order.create({
         user: userId,
         clerkId,
@@ -153,6 +148,7 @@ export async function handleWebhook(req, res) {
           const product = productById.get(item.p);
           return {
             product: item.p,
+            vendor: product?.vendor,
             name: product?.name || "Unavailable product",
             price: item.pr,
             quantity: item.q,
@@ -164,6 +160,12 @@ export async function handleWebhook(req, res) {
           id: paymentIntent.id,
           status: "succeeded",
         },
+        pricing: {
+          subtotal: orderSubtotal,
+          shipping: computePricing(orderSubtotal).shipping,
+          tax: computePricing(orderSubtotal).tax,
+        },
+        statusHistory: [{ status: "pending", note: "Order placed and paid", by: "customer" }],
         totalPrice: parseFloat(totalPrice),
       });
 

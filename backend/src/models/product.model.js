@@ -31,6 +31,11 @@ const productSchema = new mongoose.Schema(
         required: true,
       },
     ],
+    // the vendor who sells it; empty for store-owned products
+    vendor: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+    },
     averageRating: {
       type: Number,
       min: 0,
@@ -44,5 +49,7 @@ const productSchema = new mongoose.Schema(
   },
   { timestamps: true }
 );
+
+productSchema.index({ vendor: 1 });
 
 export const Product = mongoose.model("Product", productSchema);

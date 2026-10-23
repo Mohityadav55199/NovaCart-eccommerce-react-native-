@@ -57,14 +57,25 @@ export const protectRoute = [
   },
 ];
 
-export const adminOnly = (req, res, next) => {
-  if (!req.user) {
-    return res.status(401).json({ message: "Unauthorized - user not found" });
-  }
+// "admin" comes only from ADMIN_EMAIL (remove an email there and its access ends immediately);
+// "vendor" and "customer" are stored on the user
+export const getRole = (user) =>
+  adminEmails.includes(user.email.toLowerCase()) ? "admin" : user.role || "customer";
 
-  if (!adminEmails.includes(req.user.email.toLowerCase())) {
-    return res.status(403).json({ message: "Forbidden - admin access only" });
-  }
+export const requireRole =
+  (...roles) =>
+  (req, res, next) => {
+    if (!req.user) {
+      return res.status(401).json({ message: "Unauthorized - user not found" });
+    }
 
-  next();
-};
+    req.role = getRole(req.user);
+    if (!roles.includes(req.role)) {
+      return res.status(403).json({ message: `Forbidden - ${roles.join(" or ")} access only` });
+    }
+
+    next();
+  };
+
+export const adminOnly = requireRole("admin");
+export const staffOnly = requireRole("admin", "vendor");

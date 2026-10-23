@@ -59,6 +59,12 @@ const userSchema = new mongoose.Schema(
       type: String,
       default: "",
     },
+    // "admin" is not stored: admins are the emails in ADMIN_EMAIL (see auth.middleware.js)
+    role: {
+      type: String,
+      enum: ["customer", "vendor"],
+      default: "customer",
+    },
     addresses: [addressSchema],
     wishlist: [
       {
