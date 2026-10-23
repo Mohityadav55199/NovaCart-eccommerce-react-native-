@@ -12,6 +12,9 @@
   "author": "",
   "license": "ISC",
   "type": "module",
+  "engines": {
+    "node": ">=20.0.0 <25"
+  },
   "dependencies": {
     "@clerk/express": "^1.7.52",
     "cloudinary": "^2.8.0",

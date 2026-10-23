@@ -4,7 +4,7 @@
   "description": "NovaCart: full-stack e-commerce (React Native app, admin dashboard and REST API)",
   "main": "index.js",
   "engines": {
-    "node": ">=20.0.0"
+    "node": ">=20.0.0 <25"
   },
   "scripts": {
     "dev": "concurrently -n \"backend,admin,mobile\" -c \"blue,green,magenta\" \"npm run dev:backend\" \"npm run dev:admin\" \"npm run dev:mobile\"",
