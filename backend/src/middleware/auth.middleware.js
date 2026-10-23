@@ -1,6 +1,34 @@
-import { requireAuth } from "@clerk/express";
+import { clerkClient, requireAuth } from "@clerk/express";
 import { User } from "../models/user.model.js";
 import { ENV } from "../config/env.js";
+
+// creates the db user from the Clerk profile when the Inngest sync hasn't run (or is down)
+const createUserFromClerk = async (clerkId) => {
+  const clerkUser = await clerkClient.users.getUser(clerkId);
+  const email = clerkUser.emailAddresses[0]?.emailAddress;
+  if (!email) return null;
+
+  try {
+    return await User.create({
+      clerkId,
+      email,
+      name: [clerkUser.firstName, clerkUser.lastName].filter(Boolean).join(" ") || "User",
+      imageUrl: clerkUser.imageUrl,
+      addresses: [],
+      wishlist: [],
+    });
+  } catch (error) {
+    // concurrent first requests: the other one already created it
+    if (error.code === 11000) return User.findOne({ clerkId });
+    throw error;
+  }
+};
+
+const adminEmails = () =>
+  (ENV.ADMIN_EMAIL || "")
+    .split(",")
+    .map((email) => email.trim().toLowerCase())
+    .filter(Boolean);
 
 export const protectRoute = [
   requireAuth(),
@@ -9,7 +37,7 @@ export const protectRoute = [
       const clerkId = req.auth().userId;
       if (!clerkId) return res.status(401).json({ message: "Unauthorized - invalid token" });
 
-      const user = await User.findOne({ clerkId });
+      const user = (await User.findOne({ clerkId })) || (await createUserFromClerk(clerkId));
       if (!user) return res.status(404).json({ message: "User not found" });
 
       req.user = user;
@@ -27,7 +55,7 @@ export const adminOnly = (req, res, next) => {
     return res.status(401).json({ message: "Unauthorized - user not found" });
   }
 
-  if (req.user.email !== ENV.ADMIN_EMAIL) {
+  if (!adminEmails().includes(req.user.email.toLowerCase())) {
     return res.status(403).json({ message: "Forbidden - admin access only" });
   }
 

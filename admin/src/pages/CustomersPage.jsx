@@ -3,7 +3,7 @@ import { customerApi } from "../lib/api";
 import { formatDate } from "../lib/utils";
 
 function CustomersPage() {
-  const { data, isLoading } = useQuery({
+  const { data, isLoading, isError } = useQuery({
     queryKey: ["customers"],
     queryFn: customerApi.getAll,
   });
@@ -23,7 +23,9 @@ function CustomersPage() {
       {/* CUSTOMERS TABLE */}
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
-          {isLoading ? (
+          {isError ? (
+            <div className="text-center py-12 text-error">Failed to load customers</div>
+          ) : isLoading ? (
             <div className="flex justify-center py-12">
               <span className="loading loading-spinner loading-lg" />
             </div>

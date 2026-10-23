@@ -4,12 +4,12 @@ import { DollarSignIcon, PackageIcon, ShoppingBagIcon, UsersIcon } from "lucide-
 import { capitalizeText, formatDate, getOrderStatusBadge } from "../lib/utils";
 
 function DashboardPage() {
-  const { data: ordersData, isLoading: ordersLoading } = useQuery({
+  const { data: ordersData, isLoading: ordersLoading, isError: ordersError } = useQuery({
     queryKey: ["orders"],
     queryFn: orderApi.getAll,
   });
 
-  const { data: statsData, isLoading: statsLoading } = useQuery({
+  const { data: statsData, isLoading: statsLoading, isError: statsError } = useQuery({
     queryKey: ["dashboardStats"],
     queryFn: statsApi.getDashboard,
   });
@@ -43,6 +43,12 @@ function DashboardPage() {
 
   return (
     <div className="space-y-6">
+      {(statsError || ordersError) && (
+        <div role="alert" className="alert alert-error">
+          <span>Couldn't load dashboard data. Check that the backend is running and you're signed in as the admin.</span>
+        </div>
+      )}
+
       {/* STATS */}
       <div className="stats stats-vertical lg:stats-horizontal shadow w-full bg-base-100">
         {statsCards.map((stat) => (
@@ -59,7 +65,9 @@ function DashboardPage() {
         <div className="card-body">
           <h2 className="card-title">Recent Orders</h2>
 
-          {ordersLoading ? (
+          {ordersError ? (
+            <div className="text-center py-8 text-error">Failed to load orders</div>
+          ) : ordersLoading ? (
             <div className="flex justify-center py-8">
               <span className="loading loading-spinner loading-lg" />
             </div>

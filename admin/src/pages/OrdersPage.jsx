@@ -6,7 +6,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 function OrdersPage() {
   const queryClient = useQueryClient();
 
-  const { data: ordersData, isLoading } = useQuery({
+  const { data: ordersData, isLoading, isError } = useQuery({
     queryKey: ["orders"],
     queryFn: orderApi.getAll,
   });
@@ -36,7 +36,9 @@ function OrdersPage() {
       {/* ORDERS TABLE */}
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
-          {isLoading ? (
+          {isError ? (
+            <div className="text-center py-12 text-error">Failed to load orders</div>
+          ) : isLoading ? (
             <div className="flex justify-center py-12">
               <span className="loading loading-spinner loading-lg" />
             </div>
