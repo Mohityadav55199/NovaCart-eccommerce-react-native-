@@ -1,4 +1,5 @@
-import { orderApi } from "../lib/api";
+import { orderApi } from "../lib/api";
+import { describeError, ERROR_HINT } from "../lib/errors";
 import { formatDate } from "../lib/utils";
 
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
@@ -6,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 function OrdersPage() {
   const queryClient = useQueryClient();
 
-  const { data: ordersData, isLoading, isError } = useQuery({
+  const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ["orders"],
     queryFn: orderApi.getAll,
   });
@@ -38,7 +39,7 @@ function OrdersPage() {
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
           {isError ? (
-            <div className="text-center py-12 text-error">Failed to load orders</div>
+            <div className="text-center py-12 text-error">Failed to load orders ({describeError(error)}). {ERROR_HINT}</div>
           ) : isLoading ? (
             <div className="flex justify-center py-12">
               <span className="loading loading-spinner loading-lg" />

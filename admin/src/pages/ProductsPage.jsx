@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState } from "react";
+import { describeError, ERROR_HINT } from "../lib/errors";
 import { PlusIcon, PencilIcon, Trash2Icon, XIcon, ImageIcon } from "lucide-react";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { productApi } from "../lib/api";
@@ -24,6 +25,7 @@ function ProductsPage() {
     data: products = [],
     isLoading: productsLoading,
     isError: productsError,
+    error: productsErr,
   } = useQuery({
     queryKey: ["products"],
     queryFn: productApi.getAll,
@@ -142,7 +144,7 @@ function ProductsPage() {
       {/* PRODUCTS GRID */}
       {productsError && (
         <div role="alert" className="alert alert-error">
-          <span>Failed to load products. Check that the backend is running and you are signed in as the admin.</span>
+          <span>Failed to load products ({describeError(productsErr)}). {ERROR_HINT}</span>
         </div>
       )}
       {productsLoading && (

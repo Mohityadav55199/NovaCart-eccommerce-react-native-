@@ -1,4 +1,5 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { describeError, ERROR_HINT } from "../lib/errors";
 import { orderApi, statsApi } from "../lib/api";
 import { DollarSignIcon, PackageIcon, ShoppingBagIcon, UsersIcon } from "lucide-react";
 import { capitalizeText, formatDate, getOrderStatusBadge } from "../lib/utils";
@@ -47,13 +48,7 @@ function DashboardPage() {
         <div role="alert" className="alert alert-error">
           <span>
             Couldn't load dashboard data
-            {(() => {
-              const err = statsErr || ordersErr;
-              const status = err?.response?.status;
-              const detail = err?.response?.data?.message || err?.response?.data?.error || err?.message;
-              return ` (${status ? `HTTP ${status}: ` : ""}${detail}).`;
-            })()}{" "}
-            401 means not signed in, 403 means this email is not the admin, and a network error means the API is asleep or unreachable.
+            {" "}({describeError(statsErr || ordersErr)}). {ERROR_HINT}
           </span>
         </div>
       )}

@@ -1,10 +1,11 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery } from "@tanstack/react-query";
+import { describeError, ERROR_HINT } from "../lib/errors";
 import Avatar from "../components/Avatar";
 import { customerApi } from "../lib/api";
 import { formatDate } from "../lib/utils";
 
 function CustomersPage() {
-  const { data, isLoading, isError } = useQuery({
+  const { data, isLoading, isError, error } = useQuery({
     queryKey: ["customers"],
     queryFn: customerApi.getAll,
   });
@@ -25,7 +26,7 @@ function CustomersPage() {
       <div className="card bg-base-100 shadow-xl">
         <div className="card-body">
           {isError ? (
-            <div className="text-center py-12 text-error">Failed to load customers</div>
+            <div className="text-center py-12 text-error">Failed to load customers ({describeError(error)}). {ERROR_HINT}</div>
           ) : isLoading ? (
             <div className="flex justify-center py-12">
               <span className="loading loading-spinner loading-lg" />
