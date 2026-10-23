@@ -188,17 +188,34 @@ export async function getAllOrders(req, res) {
 
     if (!isVendor(req)) return res.status(200).json({ orders });
 
-    // a vendor sees only their own items of an order, and no customer email
+    // A vendor gets an explicit whitelist: only their own items and what they need to ship them.
+    // No payment ids, refund details, other vendors' items or totals, and no customer email.
     const mine = orders.map((order) => {
       const plain = order.toObject();
-      plain.orderItems = plain.orderItems.filter(
+      const items = plain.orderItems.filter(
         (item) => item.vendor && item.vendor.toString() === req.user._id.toString()
       );
-      plain.user = { _id: plain.user?._id, name: plain.user?.name };
-      plain.myTotal = plain.orderItems
-        .filter((item) => item.status !== "cancelled")
-        .reduce((sum, item) => sum + item.price * item.quantity, 0);
-      return plain;
+      const myItemIds = new Set(items.map((item) => item._id.toString()));
+
+      return {
+        _id: plain._id,
+        createdAt: plain.createdAt,
+        updatedAt: plain.updatedAt,
+        status: plain.status,
+        shippingAddress: plain.shippingAddress,
+        user: { _id: plain.user?._id, name: plain.user?.name },
+        orderItems: items,
+        myTotal: items
+          .filter((item) => item.status !== "cancelled")
+          .reduce((sum, item) => sum + item.price * item.quantity, 0),
+        // events about other vendors' items are left out
+        statusHistory: (plain.statusHistory || []).filter(
+          (event) => !event.item || myItemIds.has(event.item.toString())
+        ),
+        cancellation: plain.cancellation
+          ? { by: plain.cancellation.by, at: plain.cancellation.at, reason: plain.cancellation.reason }
+          : undefined,
+      };
     });
 
     res.status(200).json({ orders: mine });
@@ -225,10 +242,9 @@ export async function updateOrderStatus(req, res) {
       return res.status(400).json({ error: "This order was cancelled" });
     }
 
-    setAllItemsStatus(order, status, "admin");
-    await order.save();
+    const updated = await setAllItemsStatus(orderId, status, "admin");
 
-    res.status(200).json({ message: "Order status updated successfully", order });
+    res.status(200).json({ message: "Order status updated successfully", order: updated });
   } catch (error) {
     respondWithError(res, error, "updateOrderStatus");
   }
@@ -312,9 +328,12 @@ export async function setUserRole(req, res) {
     // Their products stay in the store, and an admin can still manage them.
     const withoutVendor = user.roles.filter((r) => r !== "vendor");
     user.roles = role === "vendor" ? [...withoutVendor, "vendor"] : withoutVendor;
-    if (role === "vendor" && !user.vendorProfile?.storeName) {
-      user.vendorProfile = { storeName: user.name, since: new Date() };
-    }
+    // suspended: they can't use "become a vendor" to undo an admin's decision; only an admin can lift it
+    user.vendorProfile = {
+      storeName: user.vendorProfile?.storeName || (role === "vendor" ? user.name : undefined),
+      since: user.vendorProfile?.since || (role === "vendor" ? new Date() : undefined),
+      suspended: role !== "vendor",
+    };
     await user.save();
 
     res.status(200).json({

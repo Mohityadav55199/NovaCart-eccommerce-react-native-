@@ -22,6 +22,11 @@ const createUserFromClerk = async (clerkId) => {
   } catch (error) {
     // concurrent first requests (or the Inngest sync) already created it
     if (error.code === 11000 && error.keyPattern?.clerkId) return User.findOne({ clerkId });
+    // the same email under an older Clerk account (deleted and re-created): Clerk verified the email,
+    // so the existing record moves to the new Clerk id and keeps its orders and roles
+    if (error.code === 11000 && error.keyPattern?.email) {
+      return User.findOneAndUpdate({ email }, { clerkId }, { new: true });
+    }
     throw error;
   }
 };

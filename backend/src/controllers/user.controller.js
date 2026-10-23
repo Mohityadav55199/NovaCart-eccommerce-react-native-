@@ -1,4 +1,6 @@
+import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
+import { Product } from "../models/product.model.js";
 import { getRole, getRoles } from "../middleware/auth.middleware.js";
 
 export async function addAddress(req, res) {
@@ -108,6 +110,10 @@ export async function addToWishlist(req, res) {
     const { productId } = req.body;
     const user = req.user;
 
+    if (!mongoose.isValidObjectId(productId) || !(await Product.exists({ _id: productId }))) {
+      return res.status(404).json({ error: "Product not found" });
+    }
+
     // check if product is already in the wishlist
     if (user.wishlist.includes(productId)) {
       return res.status(400).json({ error: "Product already in wishlist" });
@@ -180,8 +186,11 @@ export async function becomeVendor(req, res) {
     }
 
     const user = req.user;
+    if (user.vendorProfile?.suspended) {
+      return res.status(403).json({ error: "Selling is disabled for this account. Contact the store owner." });
+    }
     if (!user.roles.includes("vendor")) user.roles.push("vendor");
-    user.vendorProfile = { storeName, since: user.vendorProfile?.since || new Date() };
+    user.vendorProfile = { storeName, since: user.vendorProfile?.since || new Date(), suspended: false };
     await user.save();
 
     res.status(200).json({ message: "You are now a vendor", user: describeMe(user) });

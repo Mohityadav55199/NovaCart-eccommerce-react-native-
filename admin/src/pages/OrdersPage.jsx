@@ -15,7 +15,7 @@ function OrdersPage() {
 
   const { data: ordersData, isLoading, isError, error } = useQuery({
     queryKey: ["orders"],
-    queryFn: orderApi.getAll,
+    queryFn: () => orderApi.getAll(),
   });
 
   const allOrders = ordersData?.orders || [];

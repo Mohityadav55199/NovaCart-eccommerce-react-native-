@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useAuth } from "@clerk/clerk-react";
 import { useQuery } from "@tanstack/react-query";
 import { userApi } from "../lib/api";
@@ -56,12 +56,15 @@ function AdminGate({ children }) {
     staleTime: 5 * 60 * 1000,
   });
 
+  const rejected = isError && [401, 403].includes(error?.response?.status);
+
+  useEffect(() => {
+    if (rejected) writeCached(userId, null); // forget a cached account the server no longer accepts
+  }, [rejected, userId]);
+
   if (isLoading) return <PageLoader />;
 
-  if (isError && [401, 403].includes(error?.response?.status)) {
-    writeCached(userId, null);
-    return <AccessDenied />;
-  }
+  if (rejected) return <AccessDenied />;
 
   // unreachable and nothing cached
   if (!me) {

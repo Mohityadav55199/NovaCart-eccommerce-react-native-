@@ -1,8 +1,10 @@
+import mongoose from "mongoose";
 import { Product } from "../models/product.model.js";
 
 export async function getProductById(req, res) {
   try {
     const { id } = req.params;
+    if (!mongoose.isValidObjectId(id)) return res.status(404).json({ message: "Product not found" });
     const product = await Product.findById(id);
 
     if (!product) return res.status(404).json({ message: "Product not found" });

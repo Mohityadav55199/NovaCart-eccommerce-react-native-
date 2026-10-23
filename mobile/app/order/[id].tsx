@@ -50,10 +50,13 @@ function OrderDetailScreen() {
           style: "destructive",
           onPress: async () => {
             try {
-              await cancelOrder("Cancelled by customer");
+              const cancelled = await cancelOrder("Cancelled by customer");
+              const refunded = cancelled.cancellation?.refundAmount ?? 0;
               Alert.alert(
                 "Order cancelled",
-                `Your refund of $${order.totalPrice.toFixed(2)} has been issued. It can take 5 to 10 business days to appear on your statement.`
+                refunded > 0
+                  ? `Your refund of $${refunded.toFixed(2)} has been issued. It can take 5 to 10 business days to appear on your statement.`
+                  : "Your order was cancelled."
               );
             } catch (error: any) {
               Alert.alert("Couldn't cancel", error?.response?.data?.error || "Please try again.");

@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { Order } from "../models/order.model.js";
 import { Product } from "../models/product.model.js";
 import { Review } from "../models/review.model.js";
@@ -6,8 +7,11 @@ export async function createReview(req, res) {
   try {
     const { productId, orderId, rating } = req.body;
 
-    if (!rating || rating < 1 || rating > 5) {
-      return res.status(400).json({ error: "Rating must be between 1 and 5" });
+    if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+      return res.status(400).json({ error: "Rating must be a whole number from 1 to 5" });
+    }
+    if (!mongoose.isValidObjectId(productId) || !mongoose.isValidObjectId(orderId)) {
+      return res.status(400).json({ error: "Invalid product or order" });
     }
 
     const user = req.user;

@@ -1,4 +1,4 @@
-import { createElement, useState } from "react";
+import { createElement, useEffect, useState } from "react";
 import { Link } from "react-router";
 import { SignUp } from "@clerk/clerk-react";
 import { CheckIcon, ShoppingBagIcon, StoreIcon } from "lucide-react";
@@ -14,12 +14,16 @@ const OPTIONS = [
 function RegisterPage() {
   const [selected, setSelected] = useState(["customer"]);
 
+  // vendor if selling was chosen (they can switch to the customer view any time), otherwise customer.
+  // Runs on first render too, so a sign-up that leaves the default choice still saves it.
+  useEffect(() => {
+    writeMode(selected.includes("vendor") ? "vendor" : "customer");
+  }, [selected]);
+
   const toggle = (id) => {
     const next = selected.includes(id) ? selected.filter((item) => item !== id) : [...selected, id];
     if (next.length === 0) return; // at least one
     setSelected(next);
-    // vendor if selling was chosen (they can switch to the customer view any time), otherwise customer
-    writeMode(next.includes("vendor") ? "vendor" : "customer");
   };
 
   return (

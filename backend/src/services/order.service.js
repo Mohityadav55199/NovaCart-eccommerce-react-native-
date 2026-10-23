@@ -17,17 +17,19 @@ export const respondWithError = (res, error, label) => {
   return res.status(500).json({ error: "Internal server error" });
 };
 
+const CONFLICT = "This order changed while you were working on it. Refresh and try again.";
+
 /**
  * Cancels an order that has not shipped yet: refunds the full payment on Stripe, puts the stock back
  * and records who cancelled it and why.
  *
- * Safe to call twice at once: the first call atomically claims the order (pending -> cancelled),
- * so the refund and the restock can only happen once.
+ * Safe to call twice at once: the first call atomically claims the order (pending -> cancelled, items
+ * included), so the refund and the restock can only happen once, and no vendor update can slip in.
  */
 export async function cancelOrder(orderId, { reason = "", by }) {
   const claimed = await Order.findOneAndUpdate(
     { _id: orderId, status: "pending" },
-    { $set: { status: "cancelled" } },
+    { $set: { status: "cancelled", "orderItems.$[].status": "cancelled" } },
     { new: false }
   );
 
@@ -52,16 +54,16 @@ export async function cancelOrder(orderId, { reason = "", by }) {
       );
     }
   } catch (error) {
-    // nothing was refunded, so give the order back to the customer as it was
-    await Order.updateOne({ _id: claimed._id }, { $set: { status: "pending" } });
+    // nothing was refunded, so give the order back as it was (a pending order has only pending items)
+    await Order.updateOne(
+      { _id: claimed._id },
+      { $set: { status: "pending", "orderItems.$[].status": "pending" } }
+    );
     console.error("Stripe refund failed:", error.message);
     throw new OrderError(502, "The refund could not be processed. The order was not cancelled, please try again.");
   }
 
   const order = await Order.findById(claimed._id);
-  order.orderItems.forEach((item) => {
-    item.status = "cancelled";
-  });
   if (refund) order.paymentResult.status = "refunded";
   order.cancellation = {
     reason,
@@ -87,11 +89,42 @@ export async function cancelOrder(orderId, { reason = "", by }) {
   return order;
 }
 
+// Writes the status derived from the items, but never over a cancellation that happened meanwhile
+async function applyDerivedStatus(orderId, events) {
+  const order = await Order.findById(orderId);
+  if (!order) throw new OrderError(404, "Order not found");
+
+  const before = order.status;
+  order.recomputeStatus();
+  const changed = order.status !== before;
+
+  const result = await Order.updateOne(
+    { _id: orderId, status: { $ne: "cancelled" } },
+    {
+      $set: {
+        status: order.status,
+        shippedAt: order.shippedAt ?? null,
+        deliveredAt: order.deliveredAt ?? null,
+      },
+      $push: {
+        statusHistory: {
+          $each: changed ? [...events, { status: order.status, note: `Order is now ${order.status}`, by: "system" }] : events,
+        },
+      },
+    }
+  );
+  if (result.matchedCount === 0) throw new OrderError(409, CONFLICT);
+
+  return Order.findById(orderId);
+}
+
 const NEXT_STATUS = { pending: ["shipped", "delivered"], shipped: ["delivered"], delivered: [] };
 
 /**
  * Updates one order item's fulfilment (status, carrier, tracking number).
  * Vendors may only move their own items forward; admins may also correct an item.
+ * The write is conditional on the item and the order being unchanged, so it cannot overwrite a
+ * cancellation or another person's update (409 instead).
  */
 export async function updateItemFulfilment(order, itemId, { status, carrier, trackingNumber }, actor) {
   if (order.status === "cancelled") throw new OrderError(400, "This order was cancelled");
@@ -103,52 +136,64 @@ export async function updateItemFulfilment(order, itemId, { status, carrier, tra
   if (actor.role !== "admin" && !isOwner) throw new OrderError(403, "This item is not yours to fulfil");
   if (item.status === "cancelled") throw new OrderError(400, "This item was cancelled");
 
+  const set = {};
+  let newStatus = item.status;
+
   if (status && status !== item.status) {
     const allowed = actor.role === "admin" ? ["pending", "shipped", "delivered"] : NEXT_STATUS[item.status] || [];
     if (!allowed.includes(status)) {
       throw new OrderError(400, `Cannot change an item from ${item.status} to ${status}`);
     }
-    item.status = status;
-    if (status === "shipped") item.shippedAt = item.shippedAt || new Date();
-    if (status === "delivered") {
-      item.shippedAt = item.shippedAt || new Date();
-      item.deliveredAt = new Date();
-    }
-    if (status === "pending") {
-      item.shippedAt = undefined;
-      item.deliveredAt = undefined;
-    }
+    newStatus = status;
+    const now = new Date();
+    set["orderItems.$.status"] = status;
+    set["orderItems.$.shippedAt"] = status === "pending" ? null : item.shippedAt || now;
+    set["orderItems.$.deliveredAt"] = status === "delivered" ? now : null;
   }
 
-  if (carrier !== undefined) item.carrier = String(carrier).trim().slice(0, 60);
-  if (trackingNumber !== undefined) item.trackingNumber = String(trackingNumber).trim().slice(0, 80);
+  const newCarrier = carrier !== undefined ? String(carrier).trim().slice(0, 60) : item.carrier;
+  const newTracking = trackingNumber !== undefined ? String(trackingNumber).trim().slice(0, 80) : item.trackingNumber;
+  if (carrier !== undefined) set["orderItems.$.carrier"] = newCarrier;
+  if (trackingNumber !== undefined) set["orderItems.$.trackingNumber"] = newTracking;
 
-  const changed = order.recomputeStatus();
-  order.statusHistory.push({
-    status: item.status,
-    note: `${item.name}: ${item.status}${item.trackingNumber ? ` (tracking ${item.trackingNumber})` : ""}`,
-    by: actor.role === "admin" ? "admin" : actor.user.name,
-  });
-  if (changed) {
-    order.statusHistory.push({ status: order.status, note: `Order is now ${order.status}`, by: "system" });
-  }
+  if (Object.keys(set).length === 0) return order; // nothing to change
 
-  await order.save();
-  return order;
+  const result = await Order.updateOne(
+    {
+      _id: order._id,
+      status: { $ne: "cancelled" },
+      orderItems: { $elemMatch: { _id: item._id, status: item.status } },
+    },
+    { $set: set }
+  );
+  if (result.matchedCount === 0) throw new OrderError(409, CONFLICT);
+
+  return applyDerivedStatus(order._id, [
+    {
+      status: newStatus,
+      note: `${item.name}: ${newStatus}${newTracking ? ` (tracking ${newTracking})` : ""}`,
+      by: actor.role === "admin" ? "admin" : actor.user.name,
+      item: item._id,
+    },
+  ]);
 }
 
 // admin shortcut: move every active item of an order to the same status in one step
-export function setAllItemsStatus(order, status, by) {
+export async function setAllItemsStatus(orderId, status, by) {
   const now = new Date();
 
-  order.orderItems.forEach((item) => {
-    if (item.status === "cancelled") return;
-    item.status = status;
-    item.shippedAt = status === "pending" ? undefined : item.shippedAt || now;
-    item.deliveredAt = status === "delivered" ? item.deliveredAt || now : undefined;
-  });
+  const result = await Order.updateOne(
+    { _id: orderId, status: { $ne: "cancelled" } },
+    {
+      $set: {
+        "orderItems.$[i].status": status,
+        "orderItems.$[i].shippedAt": status === "pending" ? null : now,
+        "orderItems.$[i].deliveredAt": status === "delivered" ? now : null,
+      },
+    },
+    { arrayFilters: [{ "i.status": { $ne: "cancelled" } }] }
+  );
+  if (result.matchedCount === 0) throw new OrderError(409, CONFLICT);
 
-  const changed = order.recomputeStatus();
-  order.statusHistory.push({ status, note: `All items marked ${status}`, by });
-  if (changed) order.statusHistory.push({ status: order.status, note: `Order is now ${order.status}`, by: "system" });
+  return applyDerivedStatus(orderId, [{ status, note: `All items marked ${status}`, by }]);
 }

@@ -181,7 +181,12 @@ function OrderDetailsModal({ order, onClose }) {
         <div className="mt-4 space-y-2">
           <h4 className="font-semibold">Items</h4>
           {order.orderItems.map((item) => (
-            <ItemRow key={item._id} order={order} item={item} canEdit={canEdit} />
+            <ItemRow
+              key={`${item._id}-${item.status}-${item.carrier}-${item.trackingNumber}`}
+              order={order}
+              item={item}
+              canEdit={canEdit}
+            />
           ))}
           {role === "vendor" && (
             <p className="text-xs opacity-60">You only see the items you sell. Other items in this order belong to other sellers.</p>

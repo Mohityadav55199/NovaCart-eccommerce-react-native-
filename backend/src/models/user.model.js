@@ -69,6 +69,8 @@ const userSchema = new mongoose.Schema(
     vendorProfile: {
       storeName: { type: String, trim: true, maxlength: 60 },
       since: Date,
+      // set when an admin removes the vendor role: stops people re-granting it to themselves
+      suspended: { type: Boolean, default: false },
     },
     addresses: [addressSchema],
     wishlist: [

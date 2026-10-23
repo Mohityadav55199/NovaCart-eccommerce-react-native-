@@ -17,6 +17,7 @@ function OrdersScreen() {
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [productRatings, setProductRatings] = useState<{ [key: string]: number }>({});
+  const [savedRatings, setSavedRatings] = useState<Set<string>>(new Set());
 
   const handleOpenRating = (order: Order) => {
     setShowRatingModal(true);
@@ -29,6 +30,7 @@ function OrdersScreen() {
       initialRatings[item.product._id] = 0;
     });
     setProductRatings(initialRatings);
+    setSavedRatings(new Set());
   };
 
   const handleSubmitRating = async () => {
@@ -41,7 +43,15 @@ function OrdersScreen() {
       return;
     }
 
-    const items = selectedOrder.orderItems.filter((item) => item.product);
+    // products already rated in an earlier attempt are not sent again
+    const items = selectedOrder.orderItems.filter(
+      (item) => item.product && !savedRatings.has(item.product._id)
+    );
+    if (items.length === 0) {
+      Alert.alert("Nothing to rate", "The products in this order are no longer available.");
+      setShowRatingModal(false);
+      return;
+    }
 
     // allSettled: one failing product must not hide that the others were saved
     const results = await Promise.allSettled(
@@ -53,6 +63,12 @@ function OrdersScreen() {
         })
       )
     );
+
+    // remember what was saved so a retry only sends the rest
+    const saved = items.filter((_, index) => results[index].status === "fulfilled");
+    if (saved.length > 0) {
+      setSavedRatings((previous) => new Set([...previous, ...saved.map((item) => item.product._id)]));
+    }
 
     const failed = results.filter((result) => result.status === "rejected");
     if (failed.length > 0) {
@@ -70,6 +86,7 @@ function OrdersScreen() {
     setShowRatingModal(false);
     setSelectedOrder(null);
     setProductRatings({});
+    setSavedRatings(new Set());
   };
 
   return (
@@ -147,7 +164,7 @@ function OrdersScreen() {
                   </View>
 
                   {/* ORDER ITEMS SUMMARY */}
-                  {order.orderItems.map((item, index) => (
+                  {order.orderItems.map((item) => (
                     <Text
                       key={item._id}
                       className="text-text-secondary text-sm flex-1"

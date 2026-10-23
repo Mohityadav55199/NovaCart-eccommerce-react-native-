@@ -76,6 +76,7 @@ const statusEventSchema = new mongoose.Schema(
     status: { type: String, required: true },
     note: { type: String, default: "" },
     by: { type: String, default: "system" }, // "customer" | "admin" | vendor name | "system"
+    item: { type: mongoose.Schema.Types.ObjectId }, // set when the event is about one item (vendors only see their own)
     at: { type: Date, default: Date.now },
   },
   { _id: false }
@@ -153,7 +154,15 @@ orderSchema.methods.recomputeStatus = function () {
   const changed = next !== this.status;
   this.status = next;
 
-  if (next === "shipped" && !this.shippedAt) this.shippedAt = new Date();
+  // dates follow the status, so correcting an order backwards clears the later dates
+  if (next === "pending" || next === "cancelled") {
+    this.shippedAt = undefined;
+    this.deliveredAt = undefined;
+  }
+  if (next === "shipped") {
+    if (!this.shippedAt) this.shippedAt = new Date();
+    this.deliveredAt = undefined;
+  }
   if (next === "delivered") {
     if (!this.shippedAt) this.shippedAt = new Date();
     if (!this.deliveredAt) this.deliveredAt = new Date();
