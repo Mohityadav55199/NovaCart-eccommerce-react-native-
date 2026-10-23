@@ -13,6 +13,7 @@
     "dev:mobile": "npm run start --prefix mobile",
     "build": "npm install --prefix backend && npm install --prefix admin && npm run build --prefix admin",
     "start": "npm run start --prefix backend",
+    "wake": "node scripts/wake-server.mjs",
     "start:all": "concurrently -n \"backend,admin,mobile\" -c \"blue,green,magenta\" \"npm run dev:backend\" \"npm run dev:admin\" \"npm run dev:mobile\"",
     "install:all": "npm install && npm install --prefix backend && npm install --prefix admin && npm install --prefix mobile"
   },

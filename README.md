@@ -96,6 +96,15 @@ The API runs on **Render** and the admin dashboard on **Vercel**.
 
 The free Render plan sleeps when idle, so the first request after a pause can take about 30 to 60 seconds.
 
+#### Keeping the free API awake
+
+Render's free tier sleeps after about 15 minutes idle, and the next request waits 30 to 60 seconds for it to boot.
+
+- [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml) pings `/api/health` every 10 minutes. Enable it once: GitHub repo, **Settings, Secrets and variables, Actions, Variables**, then add `API_URL` = `https://<your-api>.onrender.com`. You can also run it by hand from the **Actions** tab.
+- [`scripts/wake-server.mjs`](scripts/wake-server.mjs) wakes the API and waits until it responds (retrying for up to a few minutes): `API_URL=https://<your-api>.onrender.com npm run wake`. Handy before a demo.
+
+Good to know: GitHub can delay scheduled runs by a few minutes and pauses them after 60 days without repo activity (re-enable in the Actions tab). One always-awake free service uses about 744 of Render's 750 free instance hours per month, so keep it to a single free service.
+
 ### 2. Admin on Vercel
 
 1. Vercel, **Add New, Project**, import this repo and set **Root Directory** to `admin` (Vite is detected automatically; [`admin/vercel.json`](admin/vercel.json) handles SPA routing).
