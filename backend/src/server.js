@@ -100,7 +100,8 @@ const startServer = async () => {
   // Render's free plan puts a service to sleep after 15 minutes without incoming requests. A request to our own
   // public address counts as traffic, so pinging it every few minutes keeps the service awake. RENDER_EXTERNAL_URL
   // is set by Render itself; KEEP_ALIVE_URL / KEEP_ALIVE_MS override it (used for local testing).
-  const keepAliveUrl = process.env.KEEP_ALIVE_URL || (ENV.NODE_ENV === "production" ? process.env.RENDER_EXTERNAL_URL : "");
+  // (RENDER_EXTERNAL_URL only exists on Render, so this never runs on a developer machine)
+  const keepAliveUrl = process.env.KEEP_ALIVE_URL || process.env.RENDER_EXTERNAL_URL || "";
   if (keepAliveUrl) {
     const everyMs = Math.max(Number(process.env.KEEP_ALIVE_MS) || 9 * 60 * 1000, 1000);
     const ping = () =>
