@@ -148,12 +148,15 @@ The free Render plan sleeps when idle, so the first request after a pause can ta
 
 #### Keeping the free API awake
 
-Render's free tier sleeps after about 15 minutes idle, and the next request waits 30 to 60 seconds for it to boot.
+Render's free tier sleeps after about 15 minutes without traffic, and the next request waits 30 to 60 seconds for it to boot. Three layers keep it awake, from most to least reliable:
 
-- [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml) pings `/api/health` every 10 minutes. Enable it once: GitHub repo, **Settings, Secrets and variables, Actions, Variables**, then add `API_URL` = `https://<your-api>.onrender.com`. You can also run it by hand from the **Actions** tab.
-- [`scripts/wake-server.mjs`](scripts/wake-server.mjs) wakes the API and waits until it responds (retrying for up to a few minutes): `API_URL=https://<your-api>.onrender.com npm run wake`. Handy before a demo.
+1. **The server pings itself** every 9 minutes ([`server.js`](backend/src/server.js)). Render sets `RENDER_EXTERNAL_URL` automatically, and a request to a service's own public address counts as traffic. Nothing to set up.
+2. **An external timer (recommended as a second layer)**, for example [cron-job.org](https://cron-job.org) (free): create a job with the URL `https://<your-api>.onrender.com/api/health`, method **GET**, every **5 minutes**, timeout **60 s**. It also wakes the service if it ever restarts.
+3. **GitHub Actions**, [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml): pings `/api/health` on a schedule. Enable it with the repo variable `API_URL` (Settings, Secrets and variables, Actions, Variables). Note that GitHub runs scheduled jobs far less often than asked (in practice a few times a day), so treat it as a backup only.
 
-Good to know: GitHub can delay scheduled runs by a few minutes and pauses them after 60 days without repo activity (re-enable in the Actions tab). One always-awake free service uses about 744 of Render's 750 free instance hours per month, so keep it to a single free service.
+[`scripts/wake-server.mjs`](scripts/wake-server.mjs) wakes the API and waits until it answers (`API_URL=https://<your-api>.onrender.com npm run wake`). Handy before a demo.
+
+One always-awake free service uses about 744 of Render's 750 free instance hours per month, so keep it to a single free service.
 
 ### 2. Admin on Vercel
 
@@ -179,6 +182,8 @@ eas build --platform android --profile preview
 ```
 
 When the build finishes, EAS prints a download link (and QR code) for the APK. Use `--local` to build on your own machine instead (needs the Android SDK).
+
+Before a build, check that the app bundles the way the build server does: `cd mobile && npx expo export --platform android`. If EAS fails with *Cannot find module `babel-preset-expo`*, make sure it is a direct dependency (`npx expo install babel-preset-expo -- --save-dev`).
 
 ## Scripts (repo root)
 
