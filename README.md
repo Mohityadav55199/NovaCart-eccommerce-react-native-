@@ -5,6 +5,16 @@
   Built by <a href="https://github.com/mohityadav55199">Mohit Yadav</a> (<code>mohityadav55199</code>).
 </p>
 
+## Live demo
+
+| | |
+|---|---|
+| **Android app (APK)** | [Download](https://expo.dev/artifacts/eas/OcbUsIGUlxkYvGsuxeIAGM0Z8lWQkFkcb_xXzN3gBrk.apk) ([build page](https://expo.dev/accounts/mohityadav55199/projects/novacart-eccommerce/builds/44530e50-b89e-4ebf-ac54-b761ca237dd7)). Allow "install from unknown sources". EAS keeps build files for a limited time: if the link has expired, rebuild with `eas build --platform android --profile preview` |
+| **Admin / vendor site** | https://nova-cart-eccommerce-react-native.vercel.app/ |
+| **API health check** | https://novacart-eccommerce-react-native.onrender.com/api/health |
+
+The app runs in **Stripe test mode**: pay with card `4242 4242 4242 4242`, any future expiry date and any CVC. No real money moves. It needs an internet connection, and the first request after a long pause can take up to a minute while the free server wakes up.
+
 ## Features
 
 - **Mobile app** (React Native + Expo): browse products, favourites, cart, addresses, Stripe checkout and order history
