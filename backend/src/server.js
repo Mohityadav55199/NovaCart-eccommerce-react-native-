@@ -97,6 +97,20 @@ const startServer = async () => {
     console.log("Server is up and running");
   });
 
+  // Render's free plan puts a service to sleep after 15 minutes without incoming requests. A request to our own
+  // public address counts as traffic, so pinging it every few minutes keeps the service awake. RENDER_EXTERNAL_URL
+  // is set by Render itself; KEEP_ALIVE_URL / KEEP_ALIVE_MS override it (used for local testing).
+  const keepAliveUrl = process.env.KEEP_ALIVE_URL || (ENV.NODE_ENV === "production" ? process.env.RENDER_EXTERNAL_URL : "");
+  if (keepAliveUrl) {
+    const everyMs = Math.max(Number(process.env.KEEP_ALIVE_MS) || 9 * 60 * 1000, 1000);
+    const ping = () =>
+      fetch(`${keepAliveUrl.replace(/\/+$/, "")}/api/health`, { signal: AbortSignal.timeout(30_000) }).catch((error) =>
+        console.error("keep-alive ping failed:", error.message)
+      );
+    setInterval(ping, everyMs).unref();
+    console.log(`Keep-alive: pinging ${keepAliveUrl} every ${Math.round(everyMs / 1000)}s`);
+  }
+
   // pays vendors whose holding period has ended, and retries payouts that failed or were interrupted
   const sweep = () => settleAllDuePayouts().catch((error) => console.error("Payout sweep failed:", error.message));
   setTimeout(sweep, 60 * 1000);
