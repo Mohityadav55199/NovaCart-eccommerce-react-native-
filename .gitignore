@@ -4,3 +4,6 @@ node_modules
 !.env.example
 # this project uses npm (package-lock.json); a stray pnpm lockfile makes Render/Vercel switch to pnpm
 pnpm-lock.yaml
+
+# Interview prep knowledge base
+interview_prep/
