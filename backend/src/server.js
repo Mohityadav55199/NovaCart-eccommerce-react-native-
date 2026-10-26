@@ -76,6 +76,20 @@ app.get("/api/health", (req, res) => {
   res.status(200).json({ message: "Success" });
 });
 
+// 404 handler for unmapped API routes
+app.all("/api/{*any}", (req, res) => {
+  res.status(404).json({ error: "Endpoint not found" });
+});
+
+// centralized error handler
+app.use((err, req, res, next) => {
+  console.error("Unhandled error:", err);
+  const status = err.status || err.statusCode || 500;
+  res.status(status).json({
+    error: err.message || "Internal server error",
+  });
+});
+
 // make our app ready for deployment
 const adminDist = path.join(__dirname, "../admin/dist");
 if (ENV.NODE_ENV === "production" && fs.existsSync(adminDist)) {
