@@ -1,6 +1,7 @@
 import { Outlet } from "react-router";
 import Navbar from "../components/Navbar";
 import Sidebar from "../components/Sidebar";
+import RenderBanner from "../components/RenderBanner";
 import { useRole } from "../lib/role";
 
 function DashboardLayout() {
@@ -14,6 +15,7 @@ function DashboardLayout() {
         <Navbar />
 
         <main className="p-6">
+          <RenderBanner dismissible className="mb-4" />
           {paused && (
             <div role="alert" className="alert alert-warning mb-4 text-sm">
               <span>Selling is paused for your store. Your products are hidden and you cannot add new ones. You can still ship open orders. Contact the store owner to resume.</span>

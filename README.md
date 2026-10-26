@@ -154,19 +154,7 @@ The API runs on **Render** and the admin dashboard on **Vercel**.
 3. In MongoDB Atlas, **Network Access**, allow Render's outbound IPs (or `0.0.0.0/0` for a hobby project).
 4. In Stripe, **Developers, Webhooks, Add endpoint**: `https://<your-api>.onrender.com/api/payment/webhook`, event `payment_intent.succeeded`. Put its signing secret in `STRIPE_WEBHOOK_SECRET`.
 
-The free Render plan sleeps when idle, so the first request after a pause can take about 30 to 60 seconds.
-
-#### Keeping the free API awake
-
-Render's free tier sleeps after about 15 minutes without traffic, and the next request waits 30 to 60 seconds for it to boot. Three layers keep it awake, from most to least reliable:
-
-1. **The server pings itself** every 9 minutes ([`server.js`](backend/src/server.js)). Render sets `RENDER_EXTERNAL_URL` automatically, and a request to a service's own public address counts as traffic. Nothing to set up.
-2. **An external timer (recommended as a second layer)**, for example [cron-job.org](https://cron-job.org) (free): create a job with the URL `https://<your-api>.onrender.com/api/health`, method **GET**, every **5 minutes**, timeout **60 s**. It also wakes the service if it ever restarts.
-3. **GitHub Actions**, [`.github/workflows/keep-alive.yml`](.github/workflows/keep-alive.yml): pings `/api/health` on a schedule. Enable it with the repo variable `API_URL` (Settings, Secrets and variables, Actions, Variables). Note that GitHub runs scheduled jobs far less often than asked (in practice a few times a day), so treat it as a backup only.
-
-[`scripts/wake-server.mjs`](scripts/wake-server.mjs) wakes the API and waits until it answers (`API_URL=https://<your-api>.onrender.com npm run wake`). Handy before a demo.
-
-One always-awake free service uses about 744 of Render's 750 free instance hours per month, so keep it to a single free service.
+The free Render plan sleeps when idle (after ~15 minutes without requests) to conserve your 750 free instance hours per month. The first request after a pause can take about 30 to 50 seconds for cold-start boot; both the admin dashboard and mobile app display a Render banner/notice informing users during spin-up.
 
 ### 2. Admin on Vercel
 

@@ -11,6 +11,7 @@ import AccessDenied from "./AccessDenied";
 import BecomeVendor from "./BecomeVendor";
 import CustomerHome from "./CustomerHome";
 import PageLoader from "./PageLoader";
+import RenderBanner from "./RenderBanner";
 
 // remember the verified account per user so a returning visit renders at once (it is re-checked in the background)
 const cacheKey = (userId) => `novacart:me:${userId}`;
@@ -77,9 +78,12 @@ function AdminGate({ children }) {
   if (!me) {
     return (
       <div className="min-h-screen flex items-center justify-center p-6">
-        <div className="text-center space-y-3">
-          <p className="text-error">Couldn&apos;t reach the server ({describeError(error)}).</p>
-          <p className="text-sm text-base-content/70">The API may be waking up, which can take up to a minute.</p>
+        <div className="text-center space-y-4 max-w-md w-full">
+          <RenderBanner />
+          <p className="text-error font-medium">Couldn&apos;t reach the server ({describeError(error)}).</p>
+          <p className="text-sm text-base-content/70">
+            If the server is asleep on the free tier, waking up can take 30–50 seconds.
+          </p>
           <button className="btn btn-primary" onClick={() => refetch()}>
             Try again
           </button>

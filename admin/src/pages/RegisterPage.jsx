@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { SignUp } from "@clerk/clerk-react";
 import { CheckIcon, ShoppingBagIcon, StoreIcon } from "lucide-react";
 import { writeMode } from "../lib/mode";
+import RenderBanner from "../components/RenderBanner";
 
 const OPTIONS = [
   { id: "customer", label: "Customer", hint: "Shop in the NovaCart app", Icon: ShoppingBagIcon },
@@ -29,6 +30,7 @@ function RegisterPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-5 p-4">
       <div className="w-full max-w-sm">
+        <RenderBanner className="mb-4" />
         <p className="text-sm text-center opacity-70 mb-2">I want to (pick one or both)</p>
         <div className="grid grid-cols-2 gap-2">
           {OPTIONS.map(({ id, label, hint, Icon }) => {

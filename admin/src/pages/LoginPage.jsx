@@ -3,6 +3,7 @@ import { Link } from "react-router";
 import { SignIn } from "@clerk/clerk-react";
 import { ShieldCheckIcon, ShoppingBagIcon, StoreIcon } from "lucide-react";
 import { readMode, writeMode } from "../lib/mode";
+import RenderBanner from "../components/RenderBanner";
 
 const MODES = [
   { id: "customer", label: "Customer", hint: "Your account and orders", icon: ShoppingBagIcon },
@@ -22,6 +23,7 @@ function LoginPage() {
   return (
     <div className="min-h-screen flex flex-col items-center justify-center gap-5 p-4">
       <div className="w-full max-w-sm">
+        <RenderBanner className="mb-4" />
         <p className="text-sm text-center opacity-70 mb-2">Sign in as</p>
         <div className="grid grid-cols-2 gap-2" role="radiogroup" aria-label="Sign in as">
           {MODES.map(({ id, label, hint, icon }) => (
