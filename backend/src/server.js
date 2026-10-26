@@ -47,8 +47,16 @@ const allowedOrigins = (ENV.CLIENT_URL || "")
 
 app.use(
   cors({
-    // no Origin header = not a browser (curl, Stripe webhook, mobile app): allow
-    origin: (origin, callback) => callback(null, !origin || allowedOrigins.includes(origin)),
+    origin: (origin, callback) => {
+      // no Origin header = not a browser (curl, Stripe webhook, mobile app): allow
+      if (!origin) return callback(null, true);
+      if (allowedOrigins.includes(origin)) return callback(null, true);
+      // In development, also permit any localhost / 127.0.0.1 origin (e.g. 127.0.0.1:5173 or other ports)
+      if (ENV.NODE_ENV !== "production" && /^https?:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(origin)) {
+        return callback(null, true);
+      }
+      callback(null, false);
+    },
     credentials: true, // lets the browser send cookies with the request
   })
 );
