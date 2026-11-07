@@ -45,6 +45,8 @@ updates:
       - dependency-name: "@react-navigation/*"
       - dependency-name: "@stripe/stripe-react-native"
       - dependency-name: "@sentry/react-native"
+      # its web SDK requires a newer React than the Expo SDK pins
+      - dependency-name: "@clerk/clerk-expo"
     groups:
       minor-and-patch:
         update-types: [minor, patch]
