@@ -1,26 +1,54 @@
 version: 2
+# Only minor and patch updates, grouped into one PR per app each month. Major versions change APIs and are
+# upgraded by hand. In the mobile app, Expo pins compatible versions of its own packages for each SDK, so those
+# are upgraded together with `npx expo install --fix` (never one by one, which breaks the build).
 updates:
   - package-ecosystem: npm
     directory: /backend
     schedule: { interval: monthly }
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+
   - package-ecosystem: npm
     directory: /admin
     schedule: { interval: monthly }
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+
   - package-ecosystem: npm
     directory: /mobile
     schedule: { interval: monthly }
-    open-pull-requests-limit: 3
+    open-pull-requests-limit: 2
+    ignore:
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+      # managed by the Expo SDK: upgrade with `npx expo install --fix`
+      - dependency-name: "expo"
+      - dependency-name: "expo-*"
+      - dependency-name: "@expo/*"
+      - dependency-name: "react"
+      - dependency-name: "react-dom"
+      - dependency-name: "react-native"
+      - dependency-name: "react-native-*"
+      - dependency-name: "@react-native/*"
+      - dependency-name: "@react-native-*"
+      - dependency-name: "@react-navigation/*"
+      - dependency-name: "@stripe/stripe-react-native"
+      - dependency-name: "@sentry/react-native"
     groups:
       minor-and-patch:
         update-types: [minor, patch]
+
   - package-ecosystem: github-actions
     directory: /
     schedule: { interval: monthly }
