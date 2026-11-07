@@ -5,6 +5,12 @@
   Built by <a href="https://github.com/mohityadav55199">Mohit Yadav</a> (<code>mohityadav55199</code>).
 </p>
 
+<p align="center">
+  <a href="https://github.com/Mohityadav55199/NovaCart-eccommerce-react-native-/actions/workflows/ci.yml"><img alt="CI" src="https://github.com/Mohityadav55199/NovaCart-eccommerce-react-native-/actions/workflows/ci.yml/badge.svg"/></a>
+  <img alt="Node" src="https://img.shields.io/badge/node-20%20%7C%2022-339933?logo=node.js&logoColor=white"/>
+  <img alt="Stack" src="https://img.shields.io/badge/stack-React%20Native%20%7C%20React%20%7C%20Express%20%7C%20MongoDB-blue"/>
+</p>
+
 ## Live demo
 
 | | |
@@ -27,6 +33,49 @@ The app runs in **Stripe test mode**: pay with card `4242 4242 4242 4242`, any f
 - **Vendors get paid** through Stripe Connect: each delivered item pays the vendor their share (platform fee configurable)
 - **Controls**: permission-based roles, an audit log, refund limits with second-admin approval, review of new vendors' products, and a pause switch per vendor
 - Optional error monitoring with Sentry
+
+## Architecture
+
+```mermaid
+flowchart LR
+    Mobile["Mobile app<br/>(React Native, Expo)"] -->|REST + Clerk token| API
+    Admin["Admin / vendor site<br/>(React, Vite, Vercel)"] -->|REST + Clerk token| API
+    subgraph API["API (Express on Render)"]
+        direction TB
+        Routes --> Services
+    end
+    API <--> DB[("MongoDB Atlas")]
+    API -->|payment intents, refunds, transfers| Stripe
+    Stripe -->|payment_intent.succeeded webhook| API
+    Clerk -->|user.created / updated / deleted webhook| API
+    API -->|verify user| Clerk
+    API -->|product images| Cloudinary
+```
+
+**How an order is made.** The server never trusts prices from the app: checkout re-reads every product from the database, works out the total and creates a Stripe payment intent with the cart packed into its metadata. The order is only created when Stripe's signed `payment_intent.succeeded` webhook arrives. The webhook is idempotent (one order per payment), reserves stock with a conditional update so two buyers cannot take the last unit, and refunds automatically if the item sold out in the meantime. **How vendors get paid.** Each order item belongs to a vendor. When an item is marked delivered and a holding period has passed (72 hours by default), the API transfers the vendor's share through Stripe Connect and keeps the platform fee. Every payout is claimed atomically and checked against existing Stripe transfers first, so a retry or a crash can never pay twice; a background sweep retries failed or waiting payouts.
+
+## Try it without setting anything up
+
+Sign-in is handled by Clerk, so there are no shared passwords: open the [admin site](https://nova-cart-eccommerce-react-native.vercel.app/), sign up with any email, and you can browse as a customer or click **Become a seller** to get the vendor dashboard (add products, see orders, set up payouts in Stripe test mode). The full admin view (all orders, refunds, audit log, product approval) is restricted to the owner's email; ask me for a walkthrough. The API first wakes up on the first request, which can take up to a minute on Render's free plan.
+
+## Tech stack
+
+| Part | Language | Main tools |
+|---|---|---|
+| API (`backend/`) | JavaScript (Node.js 20+, ES modules) | Express 5, MongoDB + Mongoose, Stripe (+ Connect), Clerk, Cloudinary, Helmet, express-rate-limit |
+| Admin site (`admin/`) | JavaScript (React 19) | Vite, TanStack Query, Tailwind + DaisyUI, Clerk |
+| Mobile app (`mobile/`) | TypeScript (React Native) | Expo Router, NativeWind, Clerk, Stripe React Native |
+
+## Testing and CI
+
+Every push and pull request runs [GitHub Actions](.github/workflows/ci.yml): the API is linted and tested on Node 20 and 22, the admin site is linted and built, and the mobile app is type-checked and linted. Run the same checks locally from the repo root:
+
+```bash
+npm run check        # lint + test + build everything (what CI runs)
+npm test             # backend tests only (Node's built-in test runner, no database needed)
+```
+
+The backend tests cover pricing maths, vendor payout splitting, role/permission rules, Stripe metadata packing and the HTTP layer (health, 404s, auth required, webhook signature check).
 
 ## Roles and permissions
 
@@ -191,6 +240,9 @@ Before a build, check that the app bundles the way the build server does: `cd mo
 | `npm run install:all` | Install every package |
 | `npm run build` | Install and build the admin |
 | `npm start` | Start the API in production mode |
+| `npm run lint` | Lint the backend, admin and mobile |
+| `npm test` | Run the backend tests |
+| `npm run check` | Lint, test and build (the same checks CI runs) |
 
 ## Author
 
