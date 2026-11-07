@@ -82,6 +82,9 @@ export async function updateCartItem(req, res) {
     const { productId } = req.params;
     const quantity = Number(req.body.quantity);
 
+    if (!mongoose.isValidObjectId(productId)) {
+      return res.status(404).json({ error: "Item not found in cart" });
+    }
     if (!Number.isInteger(quantity) || quantity < 1) {
       return res.status(400).json({ error: "Quantity must be a whole number of at least 1" });
     }
@@ -97,7 +100,7 @@ export async function updateCartItem(req, res) {
     }
 
     // check if product exists & validate stock
-    const product = await Product.findById(productId);
+    const product = await Product.findOne({ _id: productId, ...ON_SALE });
     if (!product) {
       return res.status(404).json({ error: "Product not found" });
     }

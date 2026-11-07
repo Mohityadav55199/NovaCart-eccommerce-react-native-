@@ -1,4 +1,4 @@
-// shared by the Inngest sync and the protectRoute fallback so both build users the same way
+// shared by the Clerk webhook and the protectRoute fallback so both build users the same way
 export const buildUserDoc = ({ clerkId, email, firstName, lastName, imageUrl }) => ({
   clerkId,
   email,

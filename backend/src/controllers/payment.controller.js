@@ -1,3 +1,4 @@
+import mongoose from "mongoose";
 import { ENV } from "../config/env.js";
 import { User } from "../models/user.model.js";
 import { Product } from "../models/product.model.js";
@@ -27,7 +28,7 @@ export async function createPaymentIntent(req, res) {
     const quantities = new Map();
     for (const item of cartItems) {
       const quantity = Number(item?.quantity);
-      if (!item?.product?._id || !Number.isInteger(quantity) || quantity < 1) {
+      if (!mongoose.isValidObjectId(item?.product?._id) || !Number.isInteger(quantity) || quantity < 1) {
         return res.status(400).json({ error: "Invalid cart item" });
       }
       const id = String(item.product._id);

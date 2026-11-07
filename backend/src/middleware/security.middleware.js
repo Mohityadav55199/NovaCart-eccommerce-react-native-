@@ -7,7 +7,7 @@ const base = {
   message: { error: "Too many requests. Please slow down and try again in a moment." },
 };
 
-// Stripe and Clerk call the webhooks in bursts from a few addresses, and the keep-alive ping hits /health
+// Stripe and Clerk call the webhooks in bursts from a few addresses, and Render's health check hits /health
 const exempt = (req) => /^\/api\/(payment\/webhook|webhooks\/|health)/.test(req.originalUrl);
 
 // everything under /api
