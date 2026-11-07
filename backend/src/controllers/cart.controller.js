@@ -3,9 +3,20 @@ import { Cart } from "../models/cart.model.js";
 import { Product } from "../models/product.model.js";
 import { ON_SALE } from "./product.controller.js";
 
+// Items whose product was deleted or taken off sale (paused vendor, rejected) can no longer be bought.
+// They are removed from the cart, otherwise checkout fails without saying which item is the problem.
+async function dropUnavailableItems(cart) {
+  const gone = cart.items.filter((item) => !item.product).map((item) => item._id);
+  if (gone.length === 0) return cart;
+  await Cart.updateOne({ _id: cart._id }, { $pull: { items: { _id: { $in: gone } } } });
+  cart.items = cart.items.filter((item) => item.product);
+  return cart;
+}
+
 export async function getCart(req, res) {
   try {
-    let cart = await Cart.findOne({ clerkId: req.user.clerkId }).populate("items.product");
+    let cart = await Cart.findOne({ clerkId: req.user.clerkId }).populate({ path: "items.product", match: ON_SALE });
+    if (cart) cart = await dropUnavailableItems(cart);
 
     if (!cart) {
       const user = req.user;
@@ -122,6 +133,9 @@ export async function updateCartItem(req, res) {
 export async function removeFromCart(req, res) {
   try {
     const { productId } = req.params;
+    if (!mongoose.isValidObjectId(productId)) {
+      return res.status(404).json({ error: "Item not found in cart" });
+    }
 
     const cart = await Cart.findOne({ clerkId: req.user.clerkId });
     if (!cart) {

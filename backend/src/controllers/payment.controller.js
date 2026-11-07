@@ -75,12 +75,18 @@ export async function createPaymentIntent(req, res) {
     }
     metadata.totalPrice = total.toFixed(2);
 
-    // find or create the stripe customer
-    let customer;
+    // find or create the stripe customer. A stored id can be stale (customer deleted in Stripe, or the keys
+    // moved from test to live mode): then a new customer is created instead of failing every checkout
+    let customer = null;
     if (user.stripeCustomerId) {
-      // find the customer
-      customer = await stripe.customers.retrieve(user.stripeCustomerId);
-    } else {
+      try {
+        customer = await stripe.customers.retrieve(user.stripeCustomerId);
+        if (customer.deleted) customer = null;
+      } catch (error) {
+        if (error?.code !== "resource_missing") throw error;
+      }
+    }
+    if (!customer) {
       // create the customer
       customer = await stripe.customers.create({
         email: user.email,

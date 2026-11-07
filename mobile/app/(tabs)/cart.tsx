@@ -60,10 +60,10 @@ const CartScreen = () => {
 
   const cartItems = cart?.items || [];
   const subtotal = cartTotal;
-  // keep in sync with backend/src/controllers/payment.controller.js
+  // keep in sync with backend/src/config/pricing.js (whole cents, so the total shown is the amount charged)
   const shipping = subtotal >= FREE_SHIPPING_OVER ? 0 : 10;
-  const tax = subtotal * 0.08;
-  const total = subtotal + shipping + tax;
+  const tax = Math.round(subtotal * 100 * 0.08) / 100;
+  const total = Math.round((subtotal + shipping + tax) * 100) / 100;
 
   const handleQuantityChange = (productId: string, currentQuantity: number, change: number) => {
     const newQuantity = currentQuantity + change;

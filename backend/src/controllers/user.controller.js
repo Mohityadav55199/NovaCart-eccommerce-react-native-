@@ -1,6 +1,7 @@
 import mongoose from "mongoose";
 import { User } from "../models/user.model.js";
 import { Product } from "../models/product.model.js";
+import { ON_SALE } from "./product.controller.js";
 import { getPermissions, getRole, getRoles } from "../middleware/auth.middleware.js";
 
 export async function addAddress(req, res) {
@@ -60,7 +61,7 @@ export async function updateAddress(req, res) {
     const { addressId } = req.params;
 
     const user = req.user;
-    const address = user.addresses.id(addressId);
+    const address = mongoose.isValidObjectId(addressId) ? user.addresses.id(addressId) : null;
     if (!address) {
       return res.status(404).json({ error: "Address not found" });
     }
@@ -95,6 +96,10 @@ export async function deleteAddress(req, res) {
     const { addressId } = req.params;
     const user = req.user;
 
+    if (!mongoose.isValidObjectId(addressId) || !user.addresses.id(addressId)) {
+      return res.status(404).json({ error: "Address not found" });
+    }
+
     user.addresses.pull(addressId);
     await user.save();
 
@@ -110,7 +115,7 @@ export async function addToWishlist(req, res) {
     const { productId } = req.body;
     const user = req.user;
 
-    if (!mongoose.isValidObjectId(productId) || !(await Product.exists({ _id: productId }))) {
+    if (!mongoose.isValidObjectId(productId) || !(await Product.exists({ _id: productId, ...ON_SALE }))) {
       return res.status(404).json({ error: "Product not found" });
     }
 
@@ -135,7 +140,7 @@ export async function removeFromWishlist(req, res) {
     const user = req.user;
 
     // check if product is already in the wishlist
-    if (!user.wishlist.includes(productId)) {
+    if (!mongoose.isValidObjectId(productId) || !user.wishlist.includes(productId)) {
       return res.status(400).json({ error: "Product not found in wishlist" });
     }
 
@@ -152,9 +157,10 @@ export async function removeFromWishlist(req, res) {
 export async function getWishlist(req, res) {
   try {
     // we're using populate, bc wishlist is just an array of product ids
-    const user = await User.findById(req.user._id).populate("wishlist");
+    // only products that can be bought; a paused one comes back here when its vendor is resumed
+    const user = await User.findById(req.user._id).populate({ path: "wishlist", match: ON_SALE });
 
-    res.status(200).json({ wishlist: user.wishlist });
+    res.status(200).json({ wishlist: user.wishlist.filter(Boolean) });
   } catch (error) {
     console.error("Error in getWishlist controller:", error);
     res.status(500).json({ error: "Internal server error" });
