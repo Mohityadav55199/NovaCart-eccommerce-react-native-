@@ -26,7 +26,7 @@ The app runs in **Stripe test mode**: pay with card `4242 4242 4242 4242`, any f
 - **Mobile app** (React Native + Expo): browse products, favourites, cart, addresses, Stripe checkout and order history
 - **Authentication** with Clerk (email and social sign-in)
 - **Admin dashboard** (React + Vite): products (CRUD with image upload), orders, customers and live stats
-- **REST API** (Node.js + Express + MongoDB) with role-based, admin-only routes
+- **REST API** (Node.js + Express + MongoDB) with permission-based routes for admins, support staff and vendors
 - **Payments** with Stripe (payment sheet, free shipping over $100, 8% tax), including webhook-based order creation
 - **Image storage** on Cloudinary
 - **User sync** from Clerk through a signed webhook (new users, email changes, deletions); users are also created on first request as a fallback
@@ -72,10 +72,10 @@ Every push and pull request runs [GitHub Actions](.github/workflows/ci.yml): the
 
 ```bash
 npm run check        # lint + test + build everything (what CI runs)
-npm test             # backend tests only (Node's built-in test runner, no database needed)
+npm test             # backend tests (Node's built-in test runner; an in-memory MongoDB is started automatically)
 ```
 
-The backend tests cover pricing maths, vendor payout splitting, role/permission rules, Stripe metadata packing and the HTTP layer (health, 404s, auth required, webhook signature check).
+The 34 backend tests cover pricing maths, vendor payout splitting, role/permission rules, Stripe metadata packing and the HTTP layer (health, 404s, auth required, webhook signature check). Database-backed tests run against a throwaway in-memory MongoDB with Stripe faked, and cover order cancellation and refunds (including two cancels racing), refund limits and second-admin approval, cart clean-up and checkout recovery.
 
 ## Roles and permissions
 

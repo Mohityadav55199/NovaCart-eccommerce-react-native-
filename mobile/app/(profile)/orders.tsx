@@ -23,7 +23,7 @@ function OrdersScreen() {
     setShowRatingModal(true);
     setSelectedOrder(order);
 
-    // init ratings for all product to 0 - resettin the state for each product
+    // start every product of this order unrated
     const initialRatings: { [key: string]: number } = {};
     order.orderItems.forEach((item) => {
       if (!item.product) return; // product was deleted
